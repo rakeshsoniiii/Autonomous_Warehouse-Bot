@@ -1,732 +1,124 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>Warehouse Bot</title>
-<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <style>
-*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-user-select:none;user-select:none;}
-
-:root{
-  --bg:#0d0f0e;
-  --panel:#131815;
-  --border:#1e2b1f;
-  --accent:#39ff14;
-  --accent2:#00ff88;
-  --dim:#1a2e1b;
-  --text:#c8dfc9;
-  --muted:#3d5e3e;
-  --danger:#ff3a2f;
-  --warn:#ffb300;
-  --joy-bg:#0a110a;
-  --joy-ring:#1e3320;
-  --joy-knob:#39ff14;
-}
-
-html,body{
-  height:100%;width:100%;
-  background:var(--bg);
-  color:var(--text);
-  font-family:'Rajdhani',sans-serif;
-  overflow:hidden;
-  touch-action:none;
-}
-
-/* scanline overlay */
-body::before{
-  content:'';
-  position:fixed;inset:0;
-  background:repeating-linear-gradient(
-    0deg,
-    transparent,
-    transparent 2px,
-    rgba(0,0,0,.13) 2px,
-    rgba(0,0,0,.13) 4px
-  );
-  pointer-events:none;
-  z-index:999;
-}
-
-/* ── LAYOUT ── */
-.shell{
-  display:grid;
-  grid-template-rows:auto 1fr auto;
-  height:100%;
-  max-width:700px;
-  margin:0 auto;
-  padding:0 12px;
-}
-
-/* ── HEADER ── */
-header{
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  padding:10px 0 6px;
-  border-bottom:1px solid var(--border);
-}
-
-.logo{
-  display:flex;align-items:center;gap:8px;
-  font-size:1.25rem;font-weight:700;letter-spacing:.15em;
-  text-transform:uppercase;color:var(--accent);
-}
-
-.logo-icon{
-  width:28px;height:28px;
-  border:2px solid var(--accent);
-  border-radius:4px;
-  display:flex;align-items:center;justify-content:center;
-  font-size:.9rem;
-  box-shadow:0 0 8px var(--accent);
-}
-
-.conn-badge{
-  display:flex;align-items:center;gap:6px;
-  font-family:'Share Tech Mono',monospace;
-  font-size:.65rem;
-  color:var(--muted);
-  background:var(--panel);
-  border:1px solid var(--border);
-  border-radius:4px;
-  padding:5px 10px;
-  transition:all .3s;
-}
-
-.conn-badge .dot{
-  width:6px;height:6px;border-radius:50%;
-  background:var(--danger);
-  transition:background .3s;
-}
-
-.conn-badge.ok{color:var(--accent);border-color:var(--accent);}
-.conn-badge.ok .dot{background:var(--accent);box-shadow:0 0 6px var(--accent);}
-
-/* ── IP BAR ── */
-.ip-row{
-  display:flex;gap:8px;padding:8px 0;
-  border-bottom:1px solid var(--border);
-}
-
-.ip-row input{
-  flex:1;
-  background:var(--panel);
-  border:1px solid var(--border);
-  border-radius:4px;
-  color:var(--text);
-  font-family:'Share Tech Mono',monospace;
-  font-size:.8rem;
-  padding:8px 12px;
-  outline:none;
-  transition:border-color .2s;
-}
-
-.ip-row input:focus{border-color:var(--accent);}
-.ip-row input::placeholder{color:var(--muted);}
-
-.btn-conn{
-  background:var(--accent);
-  color:#000;border:none;border-radius:4px;
-  font-family:'Rajdhani',sans-serif;
-  font-weight:700;font-size:.85rem;
-  padding:8px 18px;cursor:pointer;
-  letter-spacing:.05em;
-  transition:opacity .15s;
-  white-space:nowrap;
-}
-.btn-conn:hover{opacity:.85;}
-
-/* ── CENTER AREA ── */
-.center{
-  display:grid;
-  grid-template-columns:1fr 160px 1fr;
-  gap:8px;
-  align-items:center;
-  padding:12px 0;
-}
-
-/* ── JOYSTICK ── */
-.joy-wrap{
-  display:flex;flex-direction:column;
-  align-items:center;gap:8px;
-}
-
-.joy-label{
-  font-size:.65rem;letter-spacing:.2em;
-  text-transform:uppercase;color:var(--muted);
-  font-family:'Share Tech Mono',monospace;
-}
-
-.joy-canvas-wrap{
-  position:relative;
-  width:140px;height:140px;
-}
-
-canvas.joy{
-  width:140px;height:140px;
-  touch-action:none;
-  cursor:crosshair;
-  border-radius:50%;
-}
-
-.joy-val{
-  font-family:'Share Tech Mono',monospace;
-  font-size:.6rem;color:var(--muted);
-  text-align:center;
-  min-height:14px;
-}
-
-/* ── CENTER PANEL ── */
-.ctrl-panel{
-  display:flex;flex-direction:column;
-  gap:10px;align-items:center;
-}
-
-.stat-box{
-  width:100%;
-  background:var(--panel);
-  border:1px solid var(--border);
-  border-radius:6px;
-  padding:8px 10px;
-}
-
-.stat-label{
-  font-family:'Share Tech Mono',monospace;
-  font-size:.55rem;letter-spacing:.1em;
-  color:var(--muted);text-transform:uppercase;
-  margin-bottom:3px;
-}
-
-.stat-val{
-  font-family:'Share Tech Mono',monospace;
-  font-size:1.1rem;font-weight:700;
-  color:var(--accent);
-}
-
-.stat-val.warn{color:var(--warn);}
-.stat-val.danger{color:var(--danger);}
-
-.btn-auto{
-  width:100%;
-  background:transparent;
-  border:2px solid var(--muted);
-  border-radius:6px;
-  color:var(--muted);
-  font-family:'Rajdhani',sans-serif;
-  font-weight:700;font-size:.85rem;
-  letter-spacing:.1em;
-  padding:10px 6px;
-  cursor:pointer;
-  transition:all .2s;
-  text-transform:uppercase;
-}
-
-.btn-auto:hover{border-color:var(--accent2);color:var(--accent2);}
-
-.btn-auto.active{
-  border-color:var(--accent2);
-  color:var(--accent2);
-  background:rgba(0,255,136,.07);
-  box-shadow:0 0 14px rgba(0,255,136,.2);
-}
-
-.speed-ring{
-  width:72px;height:72px;
-  position:relative;display:flex;
-  align-items:center;justify-content:center;
-}
-
-.speed-ring svg{transform:rotate(-90deg);}
-
-.speed-ring .num{
-  position:absolute;
-  font-family:'Share Tech Mono',monospace;
-  font-size:.8rem;font-weight:700;
-  color:var(--accent);
-}
-
-/* ── OBSTACLE BANNER ── */
-.obstacle-banner{
-  display:none;
-  background:rgba(255,58,47,.12);
-  border:1px solid var(--danger);
-  border-radius:4px;
-  color:var(--danger);
-  font-size:.7rem;letter-spacing:.1em;
-  text-align:center;padding:5px;
-  font-family:'Share Tech Mono',monospace;
-}
-
-.obstacle-banner.show{display:block;}
-
-/* ── BOTTOM ── */
-footer{
-  border-top:1px solid var(--border);
-  padding:8px 0 10px;
-  display:flex;gap:8px;
-  font-family:'Share Tech Mono',monospace;
-  font-size:.6rem;color:var(--muted);
-  justify-content:space-between;
-  align-items:center;
-}
-
-.log-strip{
-  flex:1;
-  overflow:hidden;
-  white-space:nowrap;
-  text-overflow:ellipsis;
-}
-
-.log-strip span{margin-right:16px;}
-.log-strip .ok{color:var(--accent);}
-.log-strip .err{color:var(--danger);}
-.log-strip .warn{color:var(--warn);}
-
-/* ── TOAST ── */
-.toast{
-  position:fixed;bottom:60px;left:50%;
-  transform:translateX(-50%) translateY(30px);
-  background:var(--panel);
-  border:1px solid var(--border);
-  border-radius:100px;
-  padding:8px 20px;
-  font-family:'Share Tech Mono',monospace;
-  font-size:.7rem;color:var(--text);
-  opacity:0;pointer-events:none;
-  transition:transform .3s,opacity .3s;
-  z-index:1000;white-space:nowrap;
-}
-
-.toast.show{transform:translateX(-50%) translateY(0);opacity:1;}
-.toast.ok{border-color:var(--accent);color:var(--accent);}
-.toast.err{border-color:var(--danger);color:var(--danger);}
+*{box-sizing:border-box;margin:0;padding:0;touch-action:none;user-select:none;}
+body{background:#111;display:flex;justify-content:center;align-items:center;min-height:100vh;}
+.wrap{background:#111;border:0.5px solid #2a2a2a;border-radius:20px;padding:16px 12px 20px;font-family:'Courier New',monospace;width:360px;}
+h1{text-align:center;font-size:13px;letter-spacing:4px;color:#00e5ff;margin-bottom:14px;}
+.stats{display:flex;justify-content:center;gap:16px;margin-bottom:14px;}
+.stat{text-align:center;}
+.lbl{display:block;font-size:9px;letter-spacing:2px;color:#555;text-transform:uppercase;}
+.val{display:block;font-size:18px;font-weight:700;color:#00e5ff;min-width:52px;}
+.val.ok{color:#00e676;} .val.warn{color:#ff5722;}
+.div{width:0.5px;background:#2a2a2a;}
+.row{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:14px;}
+.jw{display:flex;flex-direction:column;align-items:center;gap:6px;}
+.jlbl{font-size:9px;letter-spacing:2px;color:#444;text-transform:uppercase;}
+.jz{width:130px;height:130px;border-radius:50%;background:#1a1a1a;border:1.5px solid #2a2a2a;position:relative;cursor:grab;}
+.ring{position:absolute;inset:12px;border-radius:50%;border:0.5px solid #222;}
+.cross{position:absolute;inset:0;pointer-events:none;}
+.cross::before{content:'';position:absolute;top:50%;left:8px;right:8px;height:0.5px;background:#1e1e1e;transform:translateY(-50%);}
+.cross::after{content:'';position:absolute;left:50%;top:8px;bottom:8px;width:0.5px;background:#1e1e1e;transform:translateX(-50%);}
+.knob{width:44px;height:44px;border-radius:50%;background:#1e1e1e;border:1.5px solid #333;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);pointer-events:none;box-shadow:0 0 0 2px #00e5ff22;}
+.knob.on{box-shadow:0 0 0 3px #00e5ff55;}
+.mid{flex:1;display:flex;flex-direction:column;align-items:center;gap:10px;}
+.estop{width:52px;height:52px;border-radius:50%;background:#1a0505;border:2px solid #c62828;color:#ef5350;font-size:8px;letter-spacing:1.5px;text-transform:uppercase;font-family:'Courier New',monospace;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;text-align:center;line-height:1.3;}
+.estop:active{background:#2a0808;}
+.ipr{display:flex;align-items:center;gap:8px;justify-content:center;}
+.ip{background:#1a1a1a;border:0.5px solid #2a2a2a;border-radius:6px;color:#00e5ff;font-family:'Courier New',monospace;font-size:11px;padding:4px 8px;width:130px;outline:none;touch-action:auto;}
+.dot{width:8px;height:8px;border-radius:50%;background:#333;}
+.dot.ok{background:#00e676;} .dot.err{background:#ef5350;}
+.badge{display:block;text-align:center;margin-top:6px;font-size:9px;letter-spacing:2px;color:#444;}
+.badge.on{color:#00e5ff;}
 </style>
 </head>
 <body>
-
-<div class="shell">
-
-  <header>
-    <div class="logo">
-      <div class="logo-icon">⬡</div>
-      WAREHOUSE BOT
-    </div>
-    <div class="conn-badge" id="connBadge">
-      <div class="dot"></div>
-      <span id="connText">OFFLINE</span>
-    </div>
-  </header>
-
-  <div class="ip-row">
-    <input type="text" id="ipInput" placeholder="ESP32 IP — e.g. 192.168.4.1">
-    <button class="btn-conn" onclick="connect()">CONNECT</button>
+<div class="wrap">
+  <h1>Warehouse Bot</h1>
+  <div class="stats">
+    <div class="stat"><span class="lbl">L Motor</span><span class="val" id="lv">0</span></div>
+    <div class="div"></div>
+    <div class="stat"><span class="lbl">Speed %</span><span class="val ok" id="sp">0</span></div>
+    <div class="div"></div>
+    <div class="stat"><span class="lbl">R Motor</span><span class="val" id="rv">0</span></div>
   </div>
-
-  <div class="center">
-
-    <!-- LEFT JOYSTICK — controls left track -->
-    <div class="joy-wrap">
-      <div class="joy-label">LEFT TRACK</div>
-      <div class="joy-canvas-wrap">
-        <canvas class="joy" id="joyL" width="280" height="280"></canvas>
-      </div>
-      <div class="joy-val" id="joyLVal">—</div>
+  <div class="row">
+    <div class="jw">
+      <span class="jlbl">Forward/Back</span>
+      <div class="jz" id="lj"><div class="cross"></div><div class="ring"></div><div class="knob" id="lk"></div></div>
     </div>
-
-    <!-- CENTER PANEL -->
-    <div class="ctrl-panel">
-
-      <div class="stat-box">
-        <div class="stat-label">DISTANCE</div>
-        <div class="stat-val" id="distVal">—</div>
-      </div>
-
-      <!-- Speed ring visual (composite of both joysticks) -->
-      <div class="speed-ring">
-        <svg width="72" height="72" viewBox="0 0 72 72">
-          <circle cx="36" cy="36" r="30" fill="none"
-                  stroke="#1e2b1f" stroke-width="6"/>
-          <circle cx="36" cy="36" r="30" fill="none"
-                  stroke="#39ff14" stroke-width="6"
-                  stroke-dasharray="188.4"
-                  stroke-dashoffset="188.4"
-                  id="speedArc"
-                  stroke-linecap="round"/>
-        </svg>
-        <span class="num" id="speedNum">0%</span>
-      </div>
-
-      <div class="obstacle-banner" id="obsBanner">
-        ⚠ OBSTACLE
-      </div>
-
-      <button class="btn-auto" id="btnAuto" onclick="toggleAuto()">
-        AUTO MODE
-      </button>
-
+    <div class="mid">
+      <svg width="70" height="70" viewBox="0 0 70 70">
+        <circle cx="35" cy="35" r="28" fill="none" stroke="#1e1e1e" stroke-width="5"/>
+        <circle cx="35" cy="35" r="28" fill="none" stroke="#00e5ff" stroke-width="5"
+          stroke-dasharray="175.9" stroke-dashoffset="175.9"
+          stroke-linecap="round" transform="rotate(-90 35 35)" id="arc"/>
+        <text x="35" y="40" text-anchor="middle" font-family="Courier New"
+          font-size="11" font-weight="700" fill="#00e5ff" id="at">0%</text>
+      </svg>
+      <button class="estop" id="es">E<br>STOP</button>
     </div>
-
-    <!-- RIGHT JOYSTICK — controls right track -->
-    <div class="joy-wrap">
-      <div class="joy-label">RIGHT TRACK</div>
-      <div class="joy-canvas-wrap">
-        <canvas class="joy" id="joyR" width="280" height="280"></canvas>
-      </div>
-      <div class="joy-val" id="joyRVal">—</div>
+    <div class="jw">
+      <span class="jlbl">Left/Right</span>
+      <div class="jz" id="rj"><div class="cross"></div><div class="ring"></div><div class="knob" id="rk"></div></div>
     </div>
-
   </div>
-
-  <footer>
-    <div class="log-strip" id="logStrip">
-      <span class="warn">[ connect to Warehouse Bot WiFi first ]</span>
-    </div>
-    <div id="pingMs">—ms</div>
-  </footer>
-
+  <div class="ipr">
+    <span class="lbl">Bot IP</span>
+    <input class="ip" id="ip" value="192.168.1.100" spellcheck="false"/>
+    <div class="dot" id="dot"></div>
+  </div>
+  <span class="badge" id="badge">Standby</span>
 </div>
-
-<div class="toast" id="toast"></div>
-
 <script>
-// ════════════════════════════════════════════════════════
-//  CONFIG
-// ════════════════════════════════════════════════════════
-var espURL   = '';
-var isConn   = false;
-var autoOn   = false;
-
-// How often we send drive commands (ms)
-var SEND_HZ  = 50;   // 20/sec
-var STATUS_HZ = 500;
-
-// Deadzone: joystick values below this treated as 0
-var DEADZONE = 0.08;
-
-// ════════════════════════════════════════════════════════
-//  JOYSTICK CLASS
-// ════════════════════════════════════════════════════════
-function Joystick(canvasId, labelId, opts) {
-  var canvas = document.getElementById(canvasId);
-  var ctx    = canvas.getContext('2d');
-  var label  = document.getElementById(labelId);
-
-  // Virtual canvas size (CSS = 140px, logical = 280px for retina)
-  var S = 280;
-  var CX = S/2, CY = S/2;
-  var OUTER_R = S/2 - 10;
-  var KNOB_R  = 36;
-
-  // Axis output: -1..1
-  this.x = 0;
-  this.y = 0;   // +1 = forward, -1 = backward
-
-  var knobX = CX, knobY = CY;
-  var active = false;
-  var touchId = null;
-
-  var self = this;
-
-  // ── DRAW ──────────────────────────────────────────────
-  function draw() {
-    ctx.clearRect(0, 0, S, S);
-
-    // Outer ring
-    ctx.beginPath();
-    ctx.arc(CX, CY, OUTER_R, 0, Math.PI*2);
-    ctx.strokeStyle = '#1e3320';
-    ctx.lineWidth   = 2;
-    ctx.stroke();
-
-    // Cross hair
-    ctx.strokeStyle = '#162218';
-    ctx.lineWidth   = 1;
-    ctx.beginPath(); ctx.moveTo(CX, CY-OUTER_R); ctx.lineTo(CX, CY+OUTER_R); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(CX-OUTER_R, CY); ctx.lineTo(CX+OUTER_R, CY); ctx.stroke();
-
-    // Track line from center to knob
-    if (active) {
-      ctx.beginPath();
-      ctx.moveTo(CX, CY);
-      ctx.lineTo(knobX, knobY);
-      ctx.strokeStyle = 'rgba(57,255,20,.25)';
-      ctx.lineWidth   = 2;
-      ctx.stroke();
+(function(){
+  var lv=document.getElementById('lv'),rv=document.getElementById('rv'),sp=document.getElementById('sp');
+  var arc=document.getElementById('arc'),at=document.getElementById('at');
+  var dot=document.getElementById('dot'),badge=document.getElementById('badge');
+  var FB=0,TURN=0,tmr=null,last='';
+  
+  function joy(zone,knob,cb,axis){
+    var on=false,pid=null;
+    function mv(cx,cy){
+      var rc=zone.getBoundingClientRect();
+      var dx=cx-(rc.left+rc.width/2), dy=cy-(rc.top+rc.height/2);
+      var d=Math.sqrt(dx*dx+dy*dy), max=rc.width/2-22;
+      if(d>max){dx=dx/d*max;dy=dy/d*max;}
+      knob.style.transform='translate(calc(-50% + '+Math.round(dx)+'px),calc(-50% + '+Math.round(dy)+'px))';
+      var val = axis==='y' ? Math.round(-dy/max*255) : Math.round(dx/max*255);
+      cb(val);
     }
-
-    // Knob glow
-    var grad = ctx.createRadialGradient(knobX, knobY, 2, knobX, knobY, KNOB_R);
-    grad.addColorStop(0,   active ? 'rgba(57,255,20,.8)' : 'rgba(57,255,20,.3)');
-    grad.addColorStop(0.5, active ? 'rgba(57,255,20,.4)' : 'rgba(57,255,20,.1)');
-    grad.addColorStop(1,   'rgba(57,255,20,0)');
-    ctx.beginPath();
-    ctx.arc(knobX, knobY, KNOB_R, 0, Math.PI*2);
-    ctx.fillStyle = grad;
-    ctx.fill();
-
-    // Knob core
-    ctx.beginPath();
-    ctx.arc(knobX, knobY, 14, 0, Math.PI*2);
-    ctx.fillStyle   = active ? '#39ff14' : '#1e3320';
-    ctx.strokeStyle = active ? '#39ff14' : '#2a4a2b';
-    ctx.lineWidth   = 2;
-    ctx.fill();
-    ctx.stroke();
+    function rel(){if(!on)return;on=false;pid=null;knob.classList.remove('on');knob.style.transform='translate(-50%,-50%)';cb(0);}
+    zone.addEventListener('touchstart',function(e){e.preventDefault();on=true;pid=e.changedTouches[0].identifier;knob.classList.add('on');mv(e.changedTouches[0].clientX,e.changedTouches[0].clientY);},{passive:false});
+    zone.addEventListener('touchmove',function(e){e.preventDefault();if(!on)return;for(var i=0;i<e.changedTouches.length;i++){if(e.changedTouches[i].identifier===pid){mv(e.changedTouches[i].clientX,e.changedTouches[i].clientY);break;}}},{passive:false});
+    zone.addEventListener('touchend',rel,{passive:false});
+    zone.addEventListener('touchcancel',rel,{passive:false});
+    zone.addEventListener('mousedown',function(e){on=true;knob.classList.add('on');mv(e.clientX,e.clientY);function mm(e){if(on)mv(e.clientX,e.clientY);}function mu(){rel();document.removeEventListener('mousemove',mm);document.removeEventListener('mouseup',mu);}document.addEventListener('mousemove',mm);document.addEventListener('mouseup',mu);});
   }
-
-  // ── POSITION UPDATE ──────────────────────────────────
-  function updatePos(px, py) {
-    var rect = canvas.getBoundingClientRect();
-    var scl  = S / rect.width;
-
-    var dx = (px - rect.left)  * scl - CX;
-    var dy = (py - rect.top)   * scl - CY;
-    var d  = Math.sqrt(dx*dx + dy*dy);
-
-    if (d > OUTER_R) {
-      dx = dx / d * OUTER_R;
-      dy = dy / d * OUTER_R;
-    }
-
-    knobX = CX + dx;
-    knobY = CY + dy;
-
-    // Normalise: vertical ONLY for tank joysticks
-    // opts.axis: 'y' = vertical only, 'xy' = full
-    var nx = dx / OUTER_R;
-    var ny = -dy / OUTER_R;   // invert: up = positive
-
-    if (opts && opts.axis === 'y') {
-      // Lock to vertical axis — left/right drag ignored
-      knobX = CX;
-      knobY = CY - dy;
-      nx = 0;
-      // ny already correct
-    }
-
-    // Deadzone
-    self.x = (Math.abs(nx) > DEADZONE) ? nx : 0;
-    self.y = (Math.abs(ny) > DEADZONE) ? ny : 0;
-
-    updateLabel();
-    draw();
+  
+  joy(document.getElementById('lj'),document.getElementById('lk'),function(v){FB=v;upd();},'y');
+  joy(document.getElementById('rj'),document.getElementById('rk'),function(v){TURN=v;upd();},'x');
+  
+  function upd(){
+    var L = Math.max(-255, Math.min(255, FB + TURN));
+    var R = Math.max(-255, Math.min(255, FB - TURN));
+    lv.textContent=L; rv.textContent=R;
+    var s=Math.round((Math.abs(L)+Math.abs(R))/2/255*100);
+    sp.textContent=s; sp.className='val '+(s>70?'warn':s>0?'ok':'');
+    arc.setAttribute('stroke-dashoffset',(175.9-s/100*175.9).toFixed(1));
+    at.textContent=s+'%';
+    var mv=L!==0||R!==0;
+    badge.textContent=mv?'Moving':'Standby'; badge.className='badge'+(mv?' on':'');
+    if(!tmr)tmr=setTimeout(function(){tmr=null;var k=L+','+R;if(k!==last){last=k;go(L,R);}},50);
   }
-
-  function release() {
-    active  = false;
-    touchId = null;
-    knobX = CX; knobY = CY;
-    self.x = 0; self.y = 0;
-    updateLabel();
-    draw();
-  }
-
-  function updateLabel() {
-    var pct = Math.round(self.y * 100);
-    if (pct === 0) { label.textContent = '—'; return; }
-    label.textContent = (pct > 0 ? '▲ FWD ' : '▼ REV ') + Math.abs(pct) + '%';
-  }
-
-  // ── TOUCH ────────────────────────────────────────────
-  canvas.addEventListener('touchstart', function(e) {
-    e.preventDefault();
-    if (touchId !== null) return;
-    var t = e.changedTouches[0];
-    touchId = t.identifier;
-    active  = true;
-    updatePos(t.clientX, t.clientY);
-  }, { passive: false });
-
-  canvas.addEventListener('touchmove', function(e) {
-    e.preventDefault();
-    for (var i = 0; i < e.changedTouches.length; i++) {
-      if (e.changedTouches[i].identifier === touchId) {
-        updatePos(e.changedTouches[i].clientX, e.changedTouches[i].clientY);
-      }
-    }
-  }, { passive: false });
-
-  canvas.addEventListener('touchend', function(e) {
-    for (var i = 0; i < e.changedTouches.length; i++) {
-      if (e.changedTouches[i].identifier === touchId) release();
-    }
-  });
-
-  canvas.addEventListener('touchcancel', release);
-
-  // ── MOUSE (desktop testing) ──────────────────────────
-  var mouseDown = false;
-  canvas.addEventListener('mousedown', function(e) {
-    mouseDown = true; active = true;
-    updatePos(e.clientX, e.clientY);
-  });
-  window.addEventListener('mousemove', function(e) {
-    if (mouseDown) updatePos(e.clientX, e.clientY);
-  });
-  window.addEventListener('mouseup', function() {
-    if (mouseDown) { mouseDown = false; release(); }
-  });
-
-  draw();
-}
-
-// ════════════════════════════════════════════════════════
-//  INSTANTIATE JOYSTICKS
-//  axis:'y' → vertical only (pure forward/back per track)
-// ════════════════════════════════════════════════════════
-var joyL = new Joystick('joyL', 'joyLVal', { axis: 'y' });
-var joyR = new Joystick('joyR', 'joyRVal', { axis: 'y' });
-
-// ════════════════════════════════════════════════════════
-//  DRIVE LOOP
-// ════════════════════════════════════════════════════════
-var lastL = 999, lastR = 999;
-var driveTimer = null;
-
-function startDriveLoop() {
-  driveTimer = setInterval(function() {
-    if (!isConn || autoOn) return;
-
-    var l = Math.round(joyL.y * 255);
-    var r = Math.round(joyR.y * 255);
-
-    // Only send if changed
-    if (l === lastL && r === lastR) return;
-    lastL = l; lastR = r;
-
-    // Speed ring
-    var avgPct = Math.round((Math.abs(l) + Math.abs(r)) / 2 / 2.55);
-    updateSpeedRing(avgPct);
-
-    var t0 = Date.now();
-    fetch(espURL + '/drive?l=' + l + '&r=' + r)
-      .then(function(res) {
-        document.getElementById('pingMs').textContent = (Date.now()-t0) + 'ms';
-      })
-      .catch(function() { /* silent */ });
-
-  }, SEND_HZ);
-}
-
-function updateSpeedRing(pct) {
-  var circ = 188.4;
-  var offset = circ - (circ * pct / 100);
-  document.getElementById('speedArc').setAttribute('stroke-dashoffset', offset);
-  document.getElementById('speedNum').textContent = pct + '%';
-}
-
-// ════════════════════════════════════════════════════════
-//  STATUS POLL
-// ════════════════════════════════════════════════════════
-var statusTimer = null;
-
-function startStatusPoll() {
-  statusTimer = setInterval(function() {
-    if (!isConn) return;
-    fetch(espURL + '/status')
-      .then(function(r) { return r.json(); })
-      .then(function(d) {
-        // Distance
-        var dist = parseInt(d.dist);
-        var distEl = document.getElementById('distVal');
-        distEl.textContent = (dist >= 999 || dist === 0) ? '∞' : dist + ' cm';
-        distEl.className   = 'stat-val' +
-          (dist < 15 ? ' danger' : dist < 25 ? ' warn' : '');
-
-        // Obstacle banner
-        var obs = dist > 0 && dist < 15;
-        document.getElementById('obsBanner').classList.toggle('show', obs);
-
-        // Auto state
-        if (d.auto !== autoOn) {
-          autoOn = d.auto;
-          document.getElementById('btnAuto').classList.toggle('active', autoOn);
-        }
-      })
-      .catch(function() {});
-  }, STATUS_HZ);
-}
-
-// ════════════════════════════════════════════════════════
-//  CONNECT
-// ════════════════════════════════════════════════════════
-function connect() {
-  var raw = document.getElementById('ipInput').value.trim();
-  if (!raw) { toast('Enter ESP32 IP', 'err'); return; }
-  if (!raw.startsWith('http')) raw = 'http://' + raw;
-  espURL = raw.replace(/\/$/, '');
-
-  log('Connecting → ' + espURL, 'info');
-
-  fetch(espURL + '/status')
-    .then(function(r) { return r.json(); })
-    .then(function(d) {
-      isConn = true;
-      document.getElementById('connBadge').classList.add('ok');
-      document.getElementById('connText').textContent = 'ONLINE · ' + espURL.replace('http://','');
-      log('Connected. Dist: ' + d.dist + 'cm', 'ok');
-      toast('Connected!', 'ok');
-      startDriveLoop();
-      startStatusPoll();
-    })
-    .catch(function() {
-      log('Cannot reach ESP32', 'err');
-      toast('Failed — check WiFi', 'err');
-    });
-}
-
-// ════════════════════════════════════════════════════════
-//  AUTO TOGGLE
-// ════════════════════════════════════════════════════════
-function toggleAuto() {
-  if (!isConn) { toast('Not connected', 'err'); return; }
-
-  fetch(espURL + '/auto')
-    .then(function(r) { return r.json(); })
-    .then(function(d) {
-      autoOn = d.auto;
-      document.getElementById('btnAuto').classList.toggle('active', autoOn);
-      if (autoOn) {
-        updateSpeedRing(0);
-        lastL = lastR = 999;
-      }
-      log('Auto mode: ' + (autoOn ? 'ON' : 'OFF'), 'ok');
-      toast('Auto ' + (autoOn ? 'ON' : 'OFF'), 'ok');
-    })
-    .catch(function() { toast('Error', 'err'); });
-}
-
-// ════════════════════════════════════════════════════════
-//  LOG / TOAST
-// ════════════════════════════════════════════════════════
-var logs = [];
-function log(msg, type) {
-  var t = new Date().toLocaleTimeString();
-  logs.unshift({ msg: msg, type: type || 'info', t: t });
-  if (logs.length > 30) logs.pop();
-  renderLog();
-}
-
-function renderLog() {
-  var strip = document.getElementById('logStrip');
-  strip.innerHTML = logs.slice(0, 4).map(function(l) {
-    return '<span class="' + l.type + '">[' + l.t + '] ' + l.msg + '</span>';
-  }).join('');
-}
-
-var toastTmr;
-function toast(msg, type) {
-  var el = document.getElementById('toast');
-  el.textContent = msg;
-  el.className   = 'toast show ' + (type || '');
-  clearTimeout(toastTmr);
-  toastTmr = setTimeout(function() { el.classList.remove('show'); }, 2500);
-}
-
-document.getElementById('ipInput').addEventListener('keydown', function(e) {
-  if (e.key === 'Enter') connect();
-});
+  function ip(){return document.getElementById('ip').value.trim();}
+  function go(l,r){fetch('http://'+ip()+'/drive?l='+l+'&r='+r,{mode:'no-cors'}).then(function(){dot.className='dot ok';}).catch(function(){dot.className='dot err';});}
+  var es=document.getElementById('es');
+  es.addEventListener('click',function(){FB=0;TURN=0;upd();fetch('http://'+ip()+'/stop',{mode:'no-cors'}).catch(function(){});});
+  es.addEventListener('touchstart',function(e){e.preventDefault();es.click();},{passive:false});
+})();
 </script>
 </body>
 </html>
