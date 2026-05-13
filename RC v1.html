@@ -32,6 +32,10 @@ h1{text-align:center;font-size:13px;letter-spacing:4px;color:#00e5ff;margin-bott
 .dot.ok{background:#00e676;} .dot.err{background:#ef5350;}
 .badge{display:block;text-align:center;margin-top:6px;font-size:9px;letter-spacing:2px;color:#444;}
 .badge.on{color:#00e5ff;}
+.auto-btn{width:52px;height:52px;border-radius:50%;background:#1a1a1a;border:2px solid #333;color:#00e5ff;font-size:8px;letter-spacing:1.5px;text-transform:uppercase;font-family:'Courier New',monospace;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;text-align:center;line-height:1.2;margin-top:6px;transition:all 0.3s;}
+.auto-btn:active{background:#2a2a2a;}
+.auto-btn.active{background:#1a3a1a;border-color:#00e676;color:#00e676;}
+.dist{text-align:center;font-size:11px;color:#00e5ff;margin-top:6px;font-family:'Courier New',monospace;}
 </style>
 </head>
 <body>
@@ -70,6 +74,8 @@ h1{text-align:center;font-size:13px;letter-spacing:4px;color:#00e5ff;margin-bott
     <input class="ip" id="ip" value="192.168.1.100" spellcheck="false"/>
     <div class="dot" id="dot"></div>
   </div>
+  <button class="auto-btn" id="auto">AUTO</button>
+  <div class="dist">Distance: <span id="dist">--</span> cm</div>
   <span class="badge" id="badge">Standby</span>
 </div>
 <script>
@@ -77,11 +83,14 @@ h1{text-align:center;font-size:13px;letter-spacing:4px;color:#00e5ff;margin-bott
   var lv=document.getElementById('lv'),rv=document.getElementById('rv'),sp=document.getElementById('sp');
   var arc=document.getElementById('arc'),at=document.getElementById('at');
   var dot=document.getElementById('dot'),badge=document.getElementById('badge');
+  var distDisp=document.getElementById('dist');
   var FB=0,TURN=0,tmr=null,last='';
+  var autoMode=false,autoTmr=null;
   
   function joy(zone,knob,cb,axis){
     var on=false,pid=null;
     function mv(cx,cy){
+      if(autoMode)return;
       var rc=zone.getBoundingClientRect();
       var dx=cx-(rc.left+rc.width/2), dy=cy-(rc.top+rc.height/2);
       var d=Math.sqrt(dx*dx+dy*dy), max=rc.width/2-22;
@@ -90,7 +99,7 @@ h1{text-align:center;font-size:13px;letter-spacing:4px;color:#00e5ff;margin-bott
       var val = axis==='y' ? Math.round(-dy/max*255) : Math.round(dx/max*255);
       cb(val);
     }
-    function rel(){if(!on)return;on=false;pid=null;knob.classList.remove('on');knob.style.transform='translate(-50%,-50%)';cb(0);}
+    function rel(){if(!on)return;on=false;pid=null;knob.classList.remove('on');knob.style.transform='translate(-50%,-50%)';if(!autoMode)cb(0);}
     zone.addEventListener('touchstart',function(e){e.preventDefault();on=true;pid=e.changedTouches[0].identifier;knob.classList.add('on');mv(e.changedTouches[0].clientX,e.changedTouches[0].clientY);},{passive:false});
     zone.addEventListener('touchmove',function(e){e.preventDefault();if(!on)return;for(var i=0;i<e.changedTouches.length;i++){if(e.changedTouches[i].identifier===pid){mv(e.changedTouches[i].clientX,e.changedTouches[i].clientY);break;}}},{passive:false});
     zone.addEventListener('touchend',rel,{passive:false});
@@ -111,12 +120,34 @@ h1{text-align:center;font-size:13px;letter-spacing:4px;color:#00e5ff;margin-bott
     at.textContent=s+'%';
     var mv=L!==0||R!==0;
     badge.textContent=mv?'Moving':'Standby'; badge.className='badge'+(mv?' on':'');
-    if(!tmr)tmr=setTimeout(function(){tmr=null;var k=L+','+R;if(k!==last){last=k;go(L,R);}},50);
+    if(!tmr && !autoMode)tmr=setTimeout(function(){tmr=null;var k=L+','+R;if(k!==last){last=k;go(L,R);}},50);
   }
   function ip(){return document.getElementById('ip').value.trim();}
   function go(l,r){fetch('http://'+ip()+'/drive?l='+l+'&r='+r,{mode:'no-cors'}).then(function(){dot.className='dot ok';}).catch(function(){dot.className='dot err';});}
+  
+  function getDist(){
+    fetch('http://'+ip()+'/distance',{mode:'no-cors'}).then(function(r){return r.json();}).then(function(d){distDisp.textContent=d.distance;}).catch(function(){distDisp.textContent='--';});
+  }
+  
+  var autoBtn=document.getElementById('auto');
+  autoBtn.addEventListener('click',function(){
+    autoMode=!autoMode;
+    autoBtn.classList.toggle('active');
+    FB=0;TURN=0;
+    if(autoMode){
+      badge.textContent='Auto Mode'; badge.className='badge on';
+      autoTmr=setInterval(getDist,100);
+      fetch('http://'+ip()+'/auto?mode=1',{mode:'no-cors'});
+    }else{
+      badge.textContent='Standby'; badge.className='badge';
+      clearInterval(autoTmr);
+      fetch('http://'+ip()+'/auto?mode=0',{mode:'no-cors'}).catch(function(){});
+      fetch('http://'+ip()+'/stop',{mode:'no-cors'}).catch(function(){});
+    }
+  });
+  
   var es=document.getElementById('es');
-  es.addEventListener('click',function(){FB=0;TURN=0;upd();fetch('http://'+ip()+'/stop',{mode:'no-cors'}).catch(function(){});});
+  es.addEventListener('click',function(){FB=0;TURN=0;autoMode=false;autoBtn.classList.remove('active');if(autoTmr)clearInterval(autoTmr);upd();fetch('http://'+ip()+'/stop',{mode:'no-cors'}).catch(function(){});});
   es.addEventListener('touchstart',function(e){e.preventDefault();es.click();},{passive:false});
 })();
 </script>
