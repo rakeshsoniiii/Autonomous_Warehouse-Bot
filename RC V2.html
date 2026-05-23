@@ -75,11 +75,11 @@ h1{text-align:center;font-size:13px;letter-spacing:4px;color:#00e5ff;margin-bott
     <div class="dot" id="dot"></div>
   </div>
   <div style="display:flex;gap:8px;justify-content:center;margin-top:10px;flex-wrap:wrap;">
-    <button onclick="goID(1)" style="padding:6px 12px;border-radius:6px;background:#2563eb;border:none;color:white;font-weight:700;">ID 1</button>
-    <button onclick="goID(2)" style="padding:6px 12px;border-radius:6px;background:#16a34a;border:none;color:white;font-weight:700;">ID 2</button>
-    <button onclick="goID(3)" style="padding:6px 12px;border-radius:6px;background:#dc2626;border:none;color:white;font-weight:700;">ID 3</button>
-    <button id="manualBtn" onclick="setManual()" style="padding:6px 12px;border-radius:6px;background:#444;border:none;color:white;font-weight:700;">Manual</button>
-    <button id="rssiBtn" onclick="showRSSI()" style="padding:6px 12px;border-radius:6px;background:#8b5cf6;border:none;color:white;font-weight:700;">Show RSSI</button>
+    <button id="id1Btn" style="padding:6px 12px;border-radius:6px;background:#2563eb;border:none;color:white;font-weight:700;">ID 1</button>
+    <button id="id2Btn" style="padding:6px 12px;border-radius:6px;background:#16a34a;border:none;color:white;font-weight:700;">ID 2</button>
+    <button id="id3Btn" style="padding:6px 12px;border-radius:6px;background:#dc2626;border:none;color:white;font-weight:700;">ID 3</button>
+    <button id="manualBtn" style="padding:6px 12px;border-radius:6px;background:#444;border:none;color:white;font-weight:700;">Manual</button>
+    <button id="rssiBtn" style="padding:6px 12px;border-radius:6px;background:#8b5cf6;border:none;color:white;font-weight:700;">Show RSSI</button>
   </div>
   <div style="text-align:center;margin-top:8px;color:#9ca3af;">RSSI: <span id="rssiVal">--</span></div>
   <button class="auto-btn" id="auto">AUTO</button>
@@ -132,17 +132,23 @@ h1{text-align:center;font-size:13px;letter-spacing:4px;color:#00e5ff;margin-bott
   }
   function ip(){return document.getElementById('ip').value.trim();}
   function go(l,r){fetch('http://'+ip()+'/drive?l='+l+'&r='+r,{mode:'no-cors'}).then(function(){dot.className='dot ok';}).catch(function(){dot.className='dot err';});}
-  function goID(id){fetch('http://'+ip()+'/id'+id,{mode:'no-cors'}).then(function(){badge.textContent='Going to ID '+id;}).catch(function(){badge.textContent='ESP32 OFFLINE';});}
-  function setManual(){
+  window.goID = function(id){fetch('http://'+ip()+'/id'+id,{mode:'no-cors'}).then(function(){badge.textContent='Going to ID '+id;}).catch(function(){badge.textContent='ESP32 OFFLINE';});}
+  window.setManual = function(){
     // turn off auto mode on the bot
-    fetch('http://'+ip()+'/auto?mode=0',{mode:'no-cors'}).then(function(){badge.textContent='Manual Mode'; auto.classList.remove('active');}).catch(function(){badge.textContent='ESP32 OFFLINE';});
+    fetch('http://'+ip()+'/auto?mode=0',{mode:'no-cors'}).then(function(){badge.textContent='Manual Mode'; autoBtn.classList.remove('active');}).catch(function(){badge.textContent='ESP32 OFFLINE';});
   }
 
-  function showRSSI(){
+  window.showRSSI = function(){
     var out = document.getElementById('rssiVal');
     out.textContent='...';
     fetch('http://'+ip()+'/rssi').then(function(r){return r.json();}).then(function(d){ if(d.rssi===-1000) out.textContent='not found'; else out.textContent=d.rssi + ' dBm'; }).catch(function(){ out.textContent='err'; });
   }
+
+  document.getElementById('id1Btn').addEventListener('click', function(){ goID(1); });
+  document.getElementById('id2Btn').addEventListener('click', function(){ goID(2); });
+  document.getElementById('id3Btn').addEventListener('click', function(){ goID(3); });
+  document.getElementById('manualBtn').addEventListener('click', setManual);
+  document.getElementById('rssiBtn').addEventListener('click', showRSSI);
   
   function getDist(){
     fetch('http://'+ip()+'/distance',{mode:'no-cors'}).then(function(r){return r.json();}).then(function(d){distDisp.textContent=d.distance;}).catch(function(){distDisp.textContent='--';});
