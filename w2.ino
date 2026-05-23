@@ -108,6 +108,7 @@ void handleAutoMode() {
 
 void handleDistance() {
   long dist = getDistance();
+  server.sendHeader("Access-Control-Allow-Origin", "*");
   String response = "{\"distance\":" + String(dist) + "}";
   server.send(200, "application/json", response);
 }
@@ -134,9 +135,31 @@ int getBeaconRSSIAvg(int samples = 3) {
   return (int)(sum / found);
 }
 
+void displayBeaconRSSI() {
+  int rssi = getBeaconRSSIAvg(4);
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("Beacon RSSI:");
+  lcd.setCursor(0, 1);
+  if (rssi == -1000) {
+    lcd.print("Not found");
+  } else {
+    lcd.print(rssi);
+    lcd.print(" dBm");
+  }
+}
+
 void handleRSSI() {
   int r = getBeaconRSSIAvg(3);
+  server.sendHeader("Access-Control-Allow-Origin", "*");
   String resp = "{\"rssi\":" + String(r) + "}";
+  server.send(200, "application/json", resp);
+}
+
+void handleShowRSSI() {
+  displayBeaconRSSI();
+  server.sendHeader("Access-Control-Allow-Origin", "*");
+  String resp = "{\"status\":\"ok\"}";
   server.send(200, "application/json", resp);
 }
 
@@ -258,6 +281,7 @@ void setup() {
   server.on("/id2", handleID2);
   server.on("/id3", handleID3);
   server.on("/rssi", handleRSSI);
+  server.on("/showrssi", handleShowRSSI);
   server.begin();
 
   lcd.clear(); lcd.print("READY!");
