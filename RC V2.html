@@ -71,7 +71,7 @@ h1{text-align:center;font-size:13px;letter-spacing:4px;color:#00e5ff;margin-bott
   </div>
   <div class="ipr">
     <span class="lbl">Bot IP</span>
-    <input class="ip" id="ip" value="172.20.95.214" spellcheck="false"/>
+    <input class="ip" id="ip" value="192.168.1.100" spellcheck="false"/>
     <div class="dot" id="dot"></div>
   </div>
   <div style="display:flex;gap:8px;justify-content:center;margin-top:10px;flex-wrap:wrap;">
@@ -80,6 +80,7 @@ h1{text-align:center;font-size:13px;letter-spacing:4px;color:#00e5ff;margin-bott
     <button id="id3Btn" style="padding:6px 12px;border-radius:6px;background:#dc2626;border:none;color:white;font-weight:700;">ID 3</button>
     <button id="manualBtn" style="padding:6px 12px;border-radius:6px;background:#444;border:none;color:white;font-weight:700;">Manual</button>
     <button id="rssiBtn" style="padding:6px 12px;border-radius:6px;background:#8b5cf6;border:none;color:white;font-weight:700;">Show RSSI</button>
+    <button id="lcdRssiBtn" style="padding:6px 12px;border-radius:6px;background:#22c55e;border:none;color:white;font-weight:700;">Show RSSI on LCD</button>
   </div>
   <div style="text-align:center;margin-top:8px;color:#9ca3af;">RSSI: <span id="rssiVal">--</span></div>
   <button class="auto-btn" id="auto">AUTO</button>
@@ -92,6 +93,7 @@ h1{text-align:center;font-size:13px;letter-spacing:4px;color:#00e5ff;margin-bott
   var arc=document.getElementById('arc'),at=document.getElementById('at');
   var dot=document.getElementById('dot'),badge=document.getElementById('badge');
   var distDisp=document.getElementById('dist');
+  var autoBtn=document.getElementById('auto');
   var FB=0,TURN=0,tmr=null,last='';
   var autoMode=false,autoTmr=null;
   
@@ -135,13 +137,28 @@ h1{text-align:center;font-size:13px;letter-spacing:4px;color:#00e5ff;margin-bott
   window.goID = function(id){fetch('http://'+ip()+'/id'+id,{mode:'no-cors'}).then(function(){badge.textContent='Going to ID '+id;}).catch(function(){badge.textContent='ESP32 OFFLINE';});}
   window.setManual = function(){
     // turn off auto mode on the bot
-    fetch('http://'+ip()+'/auto?mode=0',{mode:'no-cors'}).then(function(){badge.textContent='Manual Mode'; autoBtn.classList.remove('active');}).catch(function(){badge.textContent='ESP32 OFFLINE';});
+    fetch('http://'+ip()+'/auto?mode=0',{mode:'no-cors'})
+      .then(function(){ badge.textContent='Manual Mode'; autoBtn.classList.remove('active'); })
+      .catch(function(){ badge.textContent='ESP32 OFFLINE'; });
   }
 
   window.showRSSI = function(){
     var out = document.getElementById('rssiVal');
     out.textContent='...';
-    fetch('http://'+ip()+'/rssi').then(function(r){return r.json();}).then(function(d){ if(d.rssi===-1000) out.textContent='not found'; else out.textContent=d.rssi + ' dBm'; }).catch(function(){ out.textContent='err'; });
+    fetch('http://'+ip()+'/rssi')
+      .then(function(r){ return r.json(); })
+      .then(function(d){ if(d.rssi===-1000) out.textContent='not found'; else out.textContent=d.rssi + ' dBm'; })
+      .catch(function(){ out.textContent='err'; });
+  }
+
+  window.showRSSIOnLCD = function(){
+    var out = document.getElementById('rssiVal');
+    out.textContent='LCD...';
+    fetch('http://'+ip()+'/showrssi')
+      .then(function(){ return fetch('http://'+ip()+'/rssi'); })
+      .then(function(r){ return r.json(); })
+      .then(function(d){ if(d.rssi===-1000) out.textContent='not found'; else out.textContent='LCD: ' + d.rssi + ' dBm'; })
+      .catch(function(){ out.textContent='err'; });
   }
 
   document.getElementById('id1Btn').addEventListener('click', function(){ goID(1); });
@@ -149,6 +166,7 @@ h1{text-align:center;font-size:13px;letter-spacing:4px;color:#00e5ff;margin-bott
   document.getElementById('id3Btn').addEventListener('click', function(){ goID(3); });
   document.getElementById('manualBtn').addEventListener('click', setManual);
   document.getElementById('rssiBtn').addEventListener('click', showRSSI);
+  document.getElementById('lcdRssiBtn').addEventListener('click', showRSSIOnLCD);
   
   function getDist(){
     fetch('http://'+ip()+'/distance',{mode:'no-cors'}).then(function(r){return r.json();}).then(function(d){distDisp.textContent=d.distance;}).catch(function(){distDisp.textContent='--';});
