@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Warehouse Bot</title>
+
+<style>
+
+body{
+
+    margin:0;
+    padding:0;
+
+    background:#0f172a;
+
+    font-family:Arial;
+
+    color:white;
+
+    text-align:center;
+}
+
+.container{
+
+    padding:20px;
+}
+
+h1{
+
+    font-size:40px;
+
+    margin-top:20px;
+
+    color:#38bdf8;
+}
+
+.card{
+
+    background:#1e293b;
+
+    border-radius:20px;
+
+    padding:20px;
+
+    margin-top:25px;
+
+    box-shadow:0 0 20px rgba(0,0,0,0.4);
+}
+
+button{
+
+    width:90%;
+
+    height:80px;
+
+    margin:15px;
+
+    border:none;
+
+    border-radius:20px;
+
+    font-size:28px;
+
+    font-weight:bold;
+
+    color:white;
+
+    cursor:pointer;
+
+    transition:0.2s;
+}
+
+button:active{
+
+    transform:scale(0.95);
+}
+
+.id1{
+
+    background:#2563eb;
+}
+
+.id2{
+
+    background:#16a34a;
+}
+
+.id3{
+
+    background:#dc2626;
+}
+
+.stop{
+
+    background:#111827;
+
+    border:2px solid white;
+}
+
+.status{
+
+    margin-top:25px;
+
+    font-size:28px;
+
+    font-weight:bold;
+
+    color:#facc15;
+}
+
+.ipbox{
+
+    margin-top:20px;
+}
+
+input{
+
+    width:80%;
+
+    height:50px;
+
+    border:none;
+
+    border-radius:12px;
+
+    padding-left:15px;
+
+    font-size:20px;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<div class="container">
+
+<h1>WAREHOUSE BOT</h1>
+
+<div class="ipbox">
+
+<input id="ip" placeholder="ESP32 IP">
+
+</div>
+
+<div class="card">
+
+<button class="id1" onclick="goID(1)">
+GO TO ID 1
+</button>
+
+<button class="id2" onclick="goID(2)">
+GO TO ID 2
+</button>
+
+<button class="id3" onclick="goID(3)">
+GO TO ID 3
+</button>
+
+<button class="stop" onclick="stopBot()">
+STOP BOT
+</button>
+
+</div>
+
+<div class="status" id="status">
+
+READY
+
+</div>
+
+</div>
+
+<script>
+
+function goID(id){
+
+    let ip = document.getElementById("ip").value;
+
+    if(ip==""){
+
+        alert("ENTER ESP32 IP");
+
+        return;
+    }
+
+    document.getElementById("status").innerHTML =
+    "GOING TO ID " + id + "...";
+
+    fetch("http://" + ip + "/id" + id)
+
+    .then(response => response.text())
+
+    .then(data => {
+
+        document.getElementById("status").innerHTML =
+        data;
+
+    })
+
+    .catch(error => {
+
+        document.getElementById("status").innerHTML =
+        "ESP32 OFFLINE";
+
+    });
+}
+
+
+function stopBot(){
+
+    let ip = document.getElementById("ip").value;
+
+    fetch("http://" + ip + "/stop");
+
+    document.getElementById("status").innerHTML =
+    "STOPPED";
+}
+
+</script>
+
+</body>
+</html>
