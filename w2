@@ -150,43 +150,51 @@ void goID1(){
 
   loadingAnimation("GO TO ID 1");
 
+  // LEFT TURN
   lcd.clear();
   lcd.print("LEFT TURN");
 
-  // LEFT
   setMotors(-170,170);
-  delay(700);
+  delay(1000);
 
   stopBot();
   delay(300);
 
   obstacleAvoid();
 
+  // FORWARD 1 SEC
   lcd.clear();
   lcd.print("FORWARD");
 
-  // FORWARD
   setMotors(180,180);
-  delay(2300);
+  delay(1000);
 
   stopBot();
   delay(300);
 
+  // RIGHT TURN
   lcd.clear();
   lcd.print("RIGHT TURN");
 
-  // RIGHT
   setMotors(170,-170);
   delay(700);
 
   stopBot();
   delay(300);
 
+  // FINAL FORWARD 2 SEC
   lcd.clear();
-  lcd.print("ARRIVED ID1");
+  lcd.print("FINAL MOVE");
+
+  setMotors(180,180);
+  delay(2000);
 
   stopBot();
+
+  lcd.clear();
+  lcd.print("ARRIVED ID1");
 }
+
 
 
 // ===================== ID2 =====================
@@ -200,8 +208,9 @@ void goID2(){
   lcd.clear();
   lcd.print("FORWARD");
 
+  // STRAIGHT 2 SEC
   setMotors(180,180);
-  delay(3200);
+  delay(2000);
 
   stopBot();
 
@@ -210,43 +219,53 @@ void goID2(){
 }
 
 
+
 // ===================== ID3 =====================
 
 void goID3(){
 
   loadingAnimation("GO TO ID 3");
 
+  // RIGHT TURN
   lcd.clear();
   lcd.print("RIGHT TURN");
 
-  // RIGHT
   setMotors(170,-170);
-  delay(700);
+  delay(1000);
 
   stopBot();
   delay(300);
 
   obstacleAvoid();
 
+  // FORWARD 1 SEC
   lcd.clear();
   lcd.print("FORWARD");
 
-  // FORWARD
   setMotors(180,180);
-  delay(2300);
+  delay(1000);
 
   stopBot();
   delay(300);
 
+  // LEFT TURN
   lcd.clear();
   lcd.print("LEFT TURN");
 
-  // LEFT
   setMotors(-170,170);
   delay(700);
 
   stopBot();
   delay(300);
+
+  // FINAL FORWARD 2 SEC
+  lcd.clear();
+  lcd.print("FINAL MOVE");
+
+  setMotors(180,180);
+  delay(2000);
+
+  stopBot();
 
   lcd.clear();
   lcd.print("ARRIVED ID3");
