@@ -1,0 +1,268 @@
+#include <WiFi.h>
+#include <WebServer.h>
+
+// ================= WIFI =================
+
+const char* ssid     = "iPhone";
+const char* password = "887766554433";
+
+// ================= SERVER =================
+
+WebServer server(80);
+
+// ================= MOTOR PINS =================
+
+#define IN1 4
+#define IN2 5
+#define ENA 14
+
+#define IN3 18
+#define IN4 19
+#define ENB 13
+
+// ================= ULTRASONIC =================
+
+#define TRIG_PIN 26
+#define ECHO_PIN 27
+
+// ================= MOTOR =================
+
+void setMotors(int l, int r){
+
+  // MOTOR BALANCE
+
+  float leftBoost  = 1.18;
+  float rightBoost = 1.00;
+
+  l = l * leftBoost;
+  r = r * rightBoost;
+
+  // ================= LEFT MOTOR =================
+
+  if(l >= 0){
+
+    digitalWrite(IN1, HIGH);
+    digitalWrite(IN2, LOW);
+
+  }else{
+
+    digitalWrite(IN1, LOW);
+    digitalWrite(IN2, HIGH);
+
+    l = -l;
+  }
+
+  // ================= RIGHT MOTOR =================
+
+  if(r >= 0){
+
+    digitalWrite(IN3, HIGH);
+    digitalWrite(IN4, LOW);
+
+  }else{
+
+    digitalWrite(IN3, LOW);
+    digitalWrite(IN4, HIGH);
+
+    r = -r;
+  }
+
+  // ================= LIMIT =================
+
+  l = constrain(l,0,255);
+  r = constrain(r,0,255);
+
+  // ================= PWM =================
+
+  ledcWrite(ENA,l);
+  ledcWrite(ENB,r);
+}
+
+// ================= STOP =================
+
+void stopBot(){
+
+  digitalWrite(IN1, LOW);
+  digitalWrite(IN2, LOW);
+
+  digitalWrite(IN3, LOW);
+  digitalWrite(IN4, LOW);
+
+  ledcWrite(ENA,0);
+  ledcWrite(ENB,0);
+}
+
+// ================= DISTANCE =================
+
+long getDistance(){
+
+  long duration;
+  long distance;
+  long total = 0;
+
+  for(int i=0;i<5;i++){
+
+    digitalWrite(TRIG_PIN, LOW);
+    delayMicroseconds(2);
+
+    digitalWrite(TRIG_PIN, HIGH);
+    delayMicroseconds(10);
+
+    digitalWrite(TRIG_PIN, LOW);
+
+    duration = pulseIn(
+      ECHO_PIN,
+      HIGH,
+      30000
+    );
+
+    distance =
+    duration * 0.034 / 2;
+
+    total += distance;
+
+    delay(5);
+  }
+
+  return total / 5;
+}
+
+// ================= DRIVE =================
+
+void handleDrive(){
+
+  int l = 0;
+  int r = 0;
+
+  if(server.hasArg("l")){
+
+    l = server.arg("l").toInt();
+  }
+
+  if(server.hasArg("r")){
+
+    r = server.arg("r").toInt();
+  }
+
+  setMotors(l,r);
+
+  server.send(
+    200,
+    "text/plain",
+    "OK"
+  );
+}
+
+// ================= STOP =================
+
+void handleStop(){
+
+  stopBot();
+
+  server.send(
+    200,
+    "text/plain",
+    "STOPPED"
+  );
+}
+
+// ================= DISTANCE =================
+
+void handleDistance(){
+
+  long d = getDistance();
+
+  server.send(
+    200,
+    "text/plain",
+    String(d)
+  );
+}
+
+// ================= SETUP =================
+
+void setup(){
+
+  Serial.begin(115200);
+
+  // ================= MOTOR PINS =================
+
+  pinMode(IN1, OUTPUT);
+  pinMode(IN2, OUTPUT);
+
+  pinMode(IN3, OUTPUT);
+  pinMode(IN4, OUTPUT);
+
+  // ================= ULTRASONIC =================
+
+  pinMode(TRIG_PIN, OUTPUT);
+  pinMode(ECHO_PIN, INPUT);
+
+  // ================= PWM =================
+
+  ledcAttach(ENA,1000,8);
+  ledcAttach(ENB,1000,8);
+
+  stopBot();
+
+  // ================= WIFI =================
+
+  WiFi.begin(
+    ssid,
+    password
+  );
+
+  Serial.print("CONNECTING");
+
+  while(
+    WiFi.status() != WL_CONNECTED
+  ){
+
+    delay(500);
+
+    Serial.print(".");
+  }
+
+  Serial.println("");
+  Serial.println("CONNECTED");
+
+  // ================= IP =================
+
+  Serial.print("ESP32 IP : ");
+
+  Serial.println(
+    WiFi.localIP()
+  );
+
+  // ================= ROUTES =================
+
+  server.on(
+    "/drive",
+    handleDrive
+  );
+
+  server.on(
+    "/stop",
+    handleStop
+  );
+
+  server.on(
+    "/distance",
+    handleDistance
+  );
+
+  // ================= START =================
+
+  server.begin();
+
+  Serial.println(
+    "SERVER STARTED"
+  );
+}
+
+// ================= LOOP =================
+
+void loop(){
+
+  server.handleClient();
+}
