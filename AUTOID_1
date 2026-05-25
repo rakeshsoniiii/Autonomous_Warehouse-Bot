@@ -1,0 +1,655 @@
+#include <WiFi.h>
+#include <WebServer.h>
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
+
+const char* ssid     = "iPhone";
+const char* password = "887766554433";
+
+WebServer server(80);
+
+LiquidCrystal_I2C lcd(0x27, 16, 2);
+
+// ===================== PINS =====================
+
+#define IN1 4
+#define IN2 5
+#define ENA 14
+
+#define IN3 18
+#define IN4 19
+#define ENB 13
+
+#define TRIG_PIN 26
+#define ECHO_PIN 27
+
+// ===================== VARIABLES =====================
+
+String currentMessage = "READY!";
+
+int lastID = 0;
+
+bool obstacleHandled = false;
+
+// ===================== MOTOR =====================
+
+void setMotors(int l, int r) {
+
+  float leftBoost  = 1.18;
+  float rightBoost = 1.00;
+
+  l = l * leftBoost;
+  r = r * rightBoost;
+
+  // LEFT MOTOR
+
+  if (l >= 0) {
+
+    digitalWrite(IN1, HIGH);
+    digitalWrite(IN2, LOW);
+
+  } else {
+
+    digitalWrite(IN1, LOW);
+    digitalWrite(IN2, HIGH);
+
+    l = -l;
+  }
+
+  // RIGHT MOTOR
+
+  if (r >= 0) {
+
+    digitalWrite(IN3, HIGH);
+    digitalWrite(IN4, LOW);
+
+  } else {
+
+    digitalWrite(IN3, LOW);
+    digitalWrite(IN4, HIGH);
+
+    r = -r;
+  }
+
+  l = constrain(l, 0, 255);
+  r = constrain(r, 0, 255);
+
+  ledcWrite(ENA, l);
+  ledcWrite(ENB, r);
+}
+
+// ===================== LCD =====================
+
+void showLCD(String line1, String line2 = "") {
+
+  lcd.clear();
+
+  lcd.setCursor(0,0);
+  lcd.print(line1);
+
+  lcd.setCursor(0,1);
+  lcd.print(line2);
+
+  currentMessage = line1;
+}
+
+// ===================== STOP =====================
+
+void stopBot() {
+
+  digitalWrite(IN1, LOW);
+  digitalWrite(IN2, LOW);
+
+  digitalWrite(IN3, LOW);
+  digitalWrite(IN4, LOW);
+
+  ledcWrite(ENA, 0);
+  ledcWrite(ENB, 0);
+}
+
+// ===================== DISTANCE =====================
+
+long getDistance() {
+
+  long duration;
+  long distance;
+  long total = 0;
+
+  for(int i=0;i<5;i++){
+
+    digitalWrite(TRIG_PIN, LOW);
+    delayMicroseconds(2);
+
+    digitalWrite(TRIG_PIN, HIGH);
+    delayMicroseconds(10);
+
+    digitalWrite(TRIG_PIN, LOW);
+
+    duration = pulseIn(ECHO_PIN, HIGH, 25000);
+
+    distance = duration * 0.034 / 2;
+
+    total += distance;
+
+    delay(5);
+  }
+
+  return total / 5;
+}
+
+// ===================== LOADING =====================
+
+void loadingAnimation(String text){
+
+  lcd.clear();
+
+  lcd.setCursor(0,0);
+  lcd.print(text);
+
+  for(int i=0;i<16;i++){
+
+    lcd.setCursor(i,1);
+
+    lcd.print((char)255);
+
+    delay(50);
+  }
+}
+
+// ===================== RETURN HOME =====================
+
+void returnHome(){
+
+  showLCD(
+    "RETURNING",
+    "HOME..."
+  );
+
+  if(lastID == 1){
+
+    setMotors(-120,-120);
+    delay(2200);
+
+    stopBot();
+  }
+
+  showLCD(
+    "HOME",
+    "REACHED"
+  );
+}
+
+// ===================== SMART BYPASS =====================
+
+void bypassObstacle(){
+
+  obstacleHandled = true;
+
+  showLCD(
+    "BYPASSING",
+    "OBJECT..."
+  );
+
+  // ================= BACK =================
+
+  setMotors(-120,-120);
+  delay(350);
+
+  stopBot();
+  delay(100);
+
+  // ================= RIGHT =================
+
+  setMotors(220,-220);
+  delay(400);
+
+  stopBot();
+  delay(100);
+
+  // ================= LONG FORWARD =================
+
+  setMotors(120,120);
+  delay(1000);
+
+  stopBot();
+  delay(100);
+
+  // ================= LEFT =================
+
+  setMotors(-220,220);
+  delay(420);
+
+  stopBot();
+  delay(100);
+
+  // ================= FORWARD =================
+
+  setMotors(150,150);
+  delay(1000);
+
+  stopBot();
+  delay(100);
+
+  // ================= LEFT =================
+
+  setMotors(-220,220);
+  delay(400);
+
+  stopBot();
+  delay(100);
+
+  // ================= FORWARD =================
+
+  setMotors(120,120);
+  delay(1000);
+
+  stopBot();
+  delay(100);
+
+  // ================= RIGHT =================
+
+  setMotors(220,-220);
+  delay(400);
+
+  stopBot();
+  delay(100);
+
+  // ================= FINAL STRAIGHT =================
+
+  showLCD(
+    "FINAL MOVE",
+    ""
+  );
+
+  setMotors(120,120);
+  delay(1000);
+
+  stopBot();
+
+  // ================= DONE =================
+
+  showLCD(
+    "ID REACHED",
+    "SUCCESS"
+  );
+
+  delay(2000);
+}
+
+// ===================== ID1 =====================
+
+void goID1(){
+
+  lastID = 1;
+
+  obstacleHandled = false;
+
+  loadingAnimation("GO TO ID1");
+
+  showLCD(
+    "BALL DETECTED",
+    "GOING ID1"
+  );
+
+  // ================= LEFT TURN =================
+
+  showLCD(
+    "LEFT TURN",
+    ""
+  );
+
+  setMotors(-220,220);
+  delay(520);
+
+  stopBot();
+  delay(120);
+
+  // ================= SMALL FORWARD =================
+
+  showLCD(
+    "SMALL FORWARD",
+    ""
+  );
+
+  setMotors(120,120);
+  delay(1000);
+
+  stopBot();
+  delay(120);
+
+  // ================= RIGHT TURN =================
+
+  showLCD(
+    "RIGHT TURN",
+    ""
+  );
+
+  setMotors(220,-220);
+  delay(420);
+
+  stopBot();
+  delay(120);
+
+  // ================= FORWARD AFTER RIGHT =================
+
+  showLCD(
+    "FORWARD",
+    ""
+  );
+
+  setMotors(120,120);
+  delay(1000);
+
+  stopBot();
+  delay(120);
+
+  // ================= NOW CHECK OBSTACLE =================
+
+  showLCD(
+    "CHECKING",
+    "OBJECT"
+  );
+
+  long firstCheck = getDistance();
+
+  // =========================================
+  // IF OBJECT FOUND
+  // =========================================
+
+  if(firstCheck > 0 && firstCheck < 22){
+
+    stopBot();
+
+    showLCD(
+      "OBJECT",
+      "DETECTED"
+    );
+
+    delay(1000);
+
+    // BYPASS MOVE
+
+    bypassObstacle();
+  }
+
+  // =========================================
+  // NO OBJECT
+  // NORMAL STRAIGHT
+  // =========================================
+
+  else{
+
+    showLCD(
+      "NO OBJECT",
+      "STRAIGHT"
+    );
+
+    // NORMAL FORWARD
+
+    setMotors(120,120);
+    delay(1800);
+
+    stopBot();
+
+    showLCD(
+      "ID REACHED",
+      "SUCCESS"
+    );
+
+    delay(2000);
+  }
+}
+
+// ===================== MANUAL =====================
+
+void handleDrive(){
+
+  int l = server.hasArg("l")
+          ? server.arg("l").toInt()
+          : 0;
+
+  int r = server.hasArg("r")
+          ? server.arg("r").toInt()
+          : 0;
+
+  setMotors(l, r);
+
+  showLCD(
+    "MANUAL MODE",
+    "RUNNING..."
+  );
+
+  server.send(
+    200,
+    "text/plain",
+    "OK"
+  );
+}
+
+// ===================== STOP =====================
+
+void handleStop(){
+
+  stopBot();
+
+  showLCD(
+    "STOPPED",
+    ""
+  );
+
+  server.send(
+    200,
+    "text/plain",
+    "STOP"
+  );
+}
+
+// ===================== RETURN =====================
+
+void handleReturn(){
+
+  returnHome();
+
+  server.send(
+    200,
+    "text/plain",
+    "RETURN DONE"
+  );
+}
+
+// ===================== ID1 =====================
+
+void handleID1(){
+
+  goID1();
+
+  server.send(
+    200,
+    "text/plain",
+    "ID1 DONE"
+  );
+}
+
+// ===================== HOME PAGE =====================
+
+void handleHome(){
+
+  String html = R"rawliteral(
+
+  <!DOCTYPE html>
+  <html>
+
+  <head>
+
+    <title>Warehouse Bot</title>
+
+    <style>
+
+      body{
+        background:#111;
+        color:white;
+        font-family:Arial;
+        text-align:center;
+        padding-top:50px;
+      }
+
+      button{
+
+        width:220px;
+        height:70px;
+
+        margin:15px;
+
+        font-size:22px;
+
+        border:none;
+
+        border-radius:12px;
+
+        cursor:pointer;
+      }
+
+      .id1{
+        background:#2196F3;
+        color:white;
+      }
+
+      .stop{
+        background:#ff9800;
+        color:white;
+      }
+
+      .manual{
+        background:#4CAF50;
+        color:white;
+      }
+
+    </style>
+
+  </head>
+
+  <body>
+
+    <h1>WAREHOUSE BOT</h1>
+
+    <h2>)rawliteral";
+
+  html += currentMessage;
+
+  html += R"rawliteral(</h2>
+
+    <button class='id1'
+    onclick="location.href='/id1'">
+    GO ID1
+    </button>
+
+    <br>
+
+    <button class='stop'
+    onclick="location.href='/stop'">
+    STOP
+    </button>
+
+    <br>
+
+    <button class='manual'
+    onclick="location.href='/drive?l=150&r=150'">
+    FORWARD
+    </button>
+
+  </body>
+
+  </html>
+
+  )rawliteral";
+
+  server.send(
+    200,
+    "text/html",
+    html
+  );
+}
+
+// ===================== SETUP =====================
+
+void setup() {
+
+  Serial.begin(115200);
+
+  Wire.begin(21,22);
+
+  lcd.init();
+  lcd.backlight();
+
+  showLCD(
+    "WAREHOUSE BOT",
+    "STARTING..."
+  );
+
+  pinMode(IN1, OUTPUT);
+  pinMode(IN2, OUTPUT);
+
+  pinMode(IN3, OUTPUT);
+  pinMode(IN4, OUTPUT);
+
+  pinMode(TRIG_PIN, OUTPUT);
+  pinMode(ECHO_PIN, INPUT);
+
+  ledcAttach(ENA, 1000, 8);
+  ledcAttach(ENB, 1000, 8);
+
+  stopBot();
+
+  // WIFI
+
+  WiFi.begin(ssid, password);
+
+  showLCD(
+    "CONNECTING",
+    "WIFI..."
+  );
+
+  while (WiFi.status() != WL_CONNECTED) {
+
+    delay(500);
+
+    Serial.print(".");
+  }
+
+  Serial.println("");
+
+  Serial.println(WiFi.localIP());
+
+  showLCD(
+    "BOT IP",
+    WiFi.localIP().toString()
+  );
+
+  delay(3000);
+
+  // ROUTES
+
+  server.on("/", handleHome);
+
+  server.on("/drive", handleDrive);
+
+  server.on("/id1", handleID1);
+
+  server.on("/stop", handleStop);
+
+  server.on("/return", handleReturn);
+
+  server.begin();
+
+  showLCD(
+    "READY!",
+    ""
+  );
+}
+
+// ===================== LOOP =====================
+
+void loop() {
+
+  server.handleClient();
+}
