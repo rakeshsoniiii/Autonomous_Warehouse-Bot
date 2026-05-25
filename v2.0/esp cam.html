@@ -1,0 +1,800 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ESP32-CAM — Warehouse Bot</title>
+  <meta name="description"
+    content="ESP32-CAM live stream and control panel for the Autonomous Warehouse Bot project." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    /* ── Reset & Base ─────────────────────────────────── */
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html {
+      font-size: 16px;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: #0d1117;
+      color: #c9d1d9;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Header ──────────────────────────────────────── */
+    header {
+      background: linear-gradient(135deg, #161b22 0%, #1f2937 100%);
+      border-bottom: 1px solid #30363d;
+      padding: 14px 24px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    header .icon {
+      font-size: 1.6em;
+    }
+
+    header h1 {
+      font-size: 1.15em;
+      font-weight: 600;
+      color: #58a6ff;
+      letter-spacing: 0.5px;
+    }
+
+    header .badge {
+      margin-left: auto;
+      background: #21262d;
+      border: 1px solid #30363d;
+      border-radius: 20px;
+      padding: 4px 12px;
+      font-size: 0.72em;
+      color: #8b949e;
+    }
+
+    #conn-dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #f85149;
+      margin-right: 5px;
+      transition: background 0.4s;
+    }
+
+    #conn-dot.online {
+      background: #3fb950;
+    }
+
+    /* ── Main layout ─────────────────────────────────── */
+    main {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 1fr 340px;
+      gap: 0;
+      max-height: calc(100vh - 57px);
+      overflow: hidden;
+    }
+
+    @media (max-width: 860px) {
+      main {
+        grid-template-columns: 1fr;
+        max-height: none;
+        overflow: auto;
+      }
+    }
+
+    /* ── Stream panel ────────────────────────────────── */
+    #stream-panel {
+      display: flex;
+      flex-direction: column;
+      background: #000;
+      position: relative;
+      border-right: 1px solid #30363d;
+    }
+
+    #stream-wrapper {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    #stream {
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+      display: none;
+      border-radius: 4px;
+    }
+
+    #no-stream {
+      text-align: center;
+      color: #30363d;
+      user-select: none;
+    }
+
+    #no-stream .cam-icon {
+      font-size: 5em;
+      display: block;
+      margin-bottom: 12px;
+    }
+
+    #no-stream p {
+      font-size: 0.9em;
+      color: #484f58;
+    }
+
+    /* FPS badge */
+    #fps-badge {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: rgba(13, 17, 23, 0.8);
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      padding: 4px 10px;
+      font-size: 0.72em;
+      color: #3fb950;
+      display: none;
+    }
+
+    /* Stream action bar */
+    #stream-actions {
+      display: flex;
+      gap: 8px;
+      padding: 10px 12px;
+      background: #161b22;
+      border-top: 1px solid #30363d;
+    }
+
+    /* ── Sidebar / Controls ──────────────────────────── */
+    #sidebar {
+      overflow-y: auto;
+      background: #161b22;
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+    }
+
+    #sidebar::-webkit-scrollbar {
+      width: 5px;
+    }
+
+    #sidebar::-webkit-scrollbar-track {
+      background: #0d1117;
+    }
+
+    #sidebar::-webkit-scrollbar-thumb {
+      background: #30363d;
+      border-radius: 4px;
+    }
+
+    /* Section */
+    .section {
+      border-bottom: 1px solid #21262d;
+      padding: 14px 16px;
+    }
+
+    .section-title {
+      font-size: 0.7em;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 1.2px;
+      color: #484f58;
+      margin-bottom: 12px;
+    }
+
+    /* ── Buttons ─────────────────────────────────────── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: #21262d;
+      color: #c9d1d9;
+      border: 1px solid #30363d;
+      padding: 7px 14px;
+      border-radius: 6px;
+      font-size: 0.82em;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.18s, border-color 0.18s, color 0.18s, transform 0.1s;
+      white-space: nowrap;
+    }
+
+    .btn:hover {
+      background: #2d333b;
+      border-color: #58a6ff;
+      color: #58a6ff;
+    }
+
+    .btn:active {
+      transform: scale(0.97);
+    }
+
+    .btn.primary {
+      background: #1f6feb;
+      border-color: #388bfd;
+      color: #fff;
+    }
+
+    .btn.primary:hover {
+      background: #388bfd;
+    }
+
+    .btn.success {
+      background: #1a7f37;
+      border-color: #2ea043;
+      color: #fff;
+    }
+
+    .btn.success:hover {
+      background: #2ea043;
+    }
+
+    .btn.danger {
+      background: #6e1e20;
+      border-color: #f85149;
+      color: #fff;
+    }
+
+    .btn.danger:hover {
+      background: #f85149;
+    }
+
+    .btn.active {
+      background: #238636;
+      border-color: #3fb950;
+      color: #fff;
+    }
+
+    .btn-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    /* ── Controls ────────────────────────────────────── */
+    .ctrl-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .ctrl-row:last-child {
+      margin-bottom: 0;
+    }
+
+    .ctrl-label {
+      min-width: 120px;
+      font-size: 0.78em;
+      color: #8b949e;
+    }
+
+    .ctrl-value {
+      min-width: 30px;
+      text-align: right;
+      font-size: 0.78em;
+      color: #58a6ff;
+      font-variant-numeric: tabular-nums;
+    }
+
+    input[type="range"] {
+      flex: 1;
+      -webkit-appearance: none;
+      appearance: none;
+      height: 4px;
+      background: #30363d;
+      border-radius: 2px;
+      outline: none;
+      cursor: pointer;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: #388bfd;
+      box-shadow: 0 0 6px rgba(56, 139, 253, .4);
+      cursor: pointer;
+    }
+
+    select {
+      flex: 1;
+      background: #21262d;
+      color: #c9d1d9;
+      border: 1px solid #30363d;
+      padding: 5px 8px;
+      border-radius: 6px;
+      font-size: 0.8em;
+      cursor: pointer;
+      outline: none;
+    }
+
+    select:focus {
+      border-color: #388bfd;
+    }
+
+    /* ── Status bar ─────────────────────────────────── */
+    #status-bar {
+      background: #0d1117;
+      border-top: 1px solid #21262d;
+      padding: 6px 16px;
+      font-size: 0.72em;
+      color: #8b949e;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    #status-bar span {
+      margin-left: auto;
+    }
+
+    /* ── Toggle switch ───────────────────────────────── */
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .toggle-row .ctrl-label {
+      flex: 1;
+    }
+
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 38px;
+      height: 20px;
+    }
+
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .slider-sw {
+      position: absolute;
+      inset: 0;
+      background: #30363d;
+      border-radius: 20px;
+      cursor: pointer;
+      transition: .3s;
+    }
+
+    .slider-sw::before {
+      content: '';
+      position: absolute;
+      width: 14px;
+      height: 14px;
+      left: 3px;
+      top: 3px;
+      background: #fff;
+      border-radius: 50%;
+      transition: .3s;
+    }
+
+    input:checked+.slider-sw {
+      background: #1f6feb;
+    }
+
+    input:checked+.slider-sw::before {
+      transform: translateX(18px);
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- ── Header ──────────────────────────────────────────────── -->
+  <header>
+    <span class="icon">🤖</span>
+    <h1>ESP32-CAM — Warehouse Bot</h1>
+    <div class="badge">
+      <span id="conn-dot"></span>
+      <span id="conn-label">Offline</span>
+    </div>
+  </header>
+
+  <!-- ── Main ────────────────────────────────────────────────── -->
+  <main>
+
+    <!-- Stream panel -->
+    <div id="stream-panel">
+      <div id="stream-wrapper">
+        <div id="no-stream">
+          <span class="cam-icon">📷</span>
+          <p>Press <strong>Start Stream</strong> to begin live feed</p>
+        </div>
+        <img id="stream" alt="ESP32-CAM live stream" />
+      </div>
+      <div id="fps-badge" id="fps">● LIVE</div>
+
+      <div id="stream-actions">
+        <button class="btn primary" id="btn-stream" onclick="toggleStream()">▶ Start Stream</button>
+        <button class="btn" id="btn-capture" onclick="capture()">📸 Capture</button>
+        <button class="btn" id="btn-flash" onclick="toggleFlash()">💡 Flash</button>
+        <button class="btn" id="btn-fullscreen" onclick="toggleFullscreen()" style="margin-left:auto">⛶
+          Fullscreen</button>
+      </div>
+    </div>
+
+    <!-- Sidebar controls -->
+    <div id="sidebar">
+
+      <!-- Resolution & Quality -->
+      <div class="section">
+        <div class="section-title">📐 Resolution &amp; Quality</div>
+
+        <div class="ctrl-row">
+          <span class="ctrl-label">Frame Size</span>
+          <select id="framesize" onchange="sendCmd('framesize', this.value)">
+            <option value="10">UXGA 1600×1200</option>
+            <option value="9">SXGA 1280×1024</option>
+            <option value="8">XGA 1024×768</option>
+            <option value="7">SVGA 800×600</option>
+            <option value="6" selected>VGA 640×480</option>
+            <option value="5">CIF 400×296</option>
+            <option value="4">QVGA 320×240</option>
+            <option value="3">HQVGA 240×176</option>
+            <option value="1">QQVGA 160×120</option>
+          </select>
+        </div>
+
+        <div class="ctrl-row">
+          <span class="ctrl-label">JPEG Quality</span>
+          <input type="range" id="quality" min="4" max="63" value="10"
+            oninput="sendCmd('quality',this.value); document.getElementById('q-val').textContent=this.value">
+          <span class="ctrl-value" id="q-val">10</span>
+        </div>
+      </div>
+
+      <!-- Image adjustments -->
+      <div class="section">
+        <div class="section-title">🎨 Image Adjustments</div>
+
+        <div class="ctrl-row">
+          <span class="ctrl-label">Brightness</span>
+          <input type="range" id="brightness" min="-2" max="2" value="0"
+            oninput="sendCmd('brightness',this.value); document.getElementById('br-val').textContent=this.value">
+          <span class="ctrl-value" id="br-val">0</span>
+        </div>
+
+        <div class="ctrl-row">
+          <span class="ctrl-label">Contrast</span>
+          <input type="range" id="contrast" min="-2" max="2" value="0"
+            oninput="sendCmd('contrast',this.value); document.getElementById('co-val').textContent=this.value">
+          <span class="ctrl-value" id="co-val">0</span>
+        </div>
+
+        <div class="ctrl-row">
+          <span class="ctrl-label">Saturation</span>
+          <input type="range" id="saturation" min="-2" max="2" value="0"
+            oninput="sendCmd('saturation',this.value); document.getElementById('sa-val').textContent=this.value">
+          <span class="ctrl-value" id="sa-val">0</span>
+        </div>
+
+        <div class="ctrl-row">
+          <span class="ctrl-label">Special Effect</span>
+          <select id="special_effect" onchange="sendCmd('special_effect',this.value)">
+            <option value="0">None</option>
+            <option value="1">Negative</option>
+            <option value="2">Grayscale</option>
+            <option value="3">Red Tint</option>
+            <option value="4">Green Tint</option>
+            <option value="5">Blue Tint</option>
+            <option value="6">Sepia</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- White balance & Exposure -->
+      <div class="section">
+        <div class="section-title">☀ White Balance &amp; Exposure</div>
+
+        <div class="toggle-row">
+          <span class="ctrl-label">Auto White Balance</span>
+          <label class="switch"><input type="checkbox" id="awb" checked onchange="sendCmd('awb',this.checked?1:0)"><span
+              class="slider-sw"></span></label>
+        </div>
+        <div class="toggle-row">
+          <span class="ctrl-label">AWB Gain</span>
+          <label class="switch"><input type="checkbox" id="awb_gain" checked
+              onchange="sendCmd('awb_gain',this.checked?1:0)"><span class="slider-sw"></span></label>
+        </div>
+        <div class="toggle-row">
+          <span class="ctrl-label">Auto Exposure</span>
+          <label class="switch"><input type="checkbox" id="aec" checked onchange="sendCmd('aec',this.checked?1:0)"><span
+              class="slider-sw"></span></label>
+        </div>
+        <div class="toggle-row">
+          <span class="ctrl-label">AEC DSP</span>
+          <label class="switch"><input type="checkbox" id="aec2" onchange="sendCmd('aec2',this.checked?1:0)"><span
+              class="slider-sw"></span></label>
+        </div>
+
+        <div class="ctrl-row">
+          <span class="ctrl-label">AE Level</span>
+          <input type="range" id="ae_level" min="-2" max="2" value="0"
+            oninput="sendCmd('ae_level',this.value); document.getElementById('ae-val').textContent=this.value">
+          <span class="ctrl-value" id="ae-val">0</span>
+        </div>
+        <div class="ctrl-row">
+          <span class="ctrl-label">Exposure</span>
+          <input type="range" id="aec_value" min="0" max="1200" value="204"
+            oninput="sendCmd('aec_value',this.value); document.getElementById('aecv-val').textContent=this.value">
+          <span class="ctrl-value" id="aecv-val">204</span>
+        </div>
+      </div>
+
+      <!-- Gain -->
+      <div class="section">
+        <div class="section-title">📡 Gain</div>
+        <div class="toggle-row">
+          <span class="ctrl-label">Auto Gain Control</span>
+          <label class="switch"><input type="checkbox" id="agc" checked onchange="sendCmd('agc',this.checked?1:0)"><span
+              class="slider-sw"></span></label>
+        </div>
+        <div class="ctrl-row">
+          <span class="ctrl-label">AGC Gain</span>
+          <input type="range" id="agc_gain" min="0" max="30" value="0"
+            oninput="sendCmd('agc_gain',this.value); document.getElementById('agcg-val').textContent=this.value">
+          <span class="ctrl-value" id="agcg-val">0</span>
+        </div>
+        <div class="ctrl-row">
+          <span class="ctrl-label">Gain Ceiling</span>
+          <input type="range" id="gainceiling" min="0" max="6" value="0"
+            oninput="sendCmd('gainceiling',this.value); document.getElementById('gc-val').textContent=this.value">
+          <span class="ctrl-value" id="gc-val">0</span>
+        </div>
+      </div>
+
+      <!-- Orientation & Misc -->
+      <div class="section">
+        <div class="section-title">🔄 Orientation &amp; Misc</div>
+        <div class="toggle-row">
+          <span class="ctrl-label">Vertical Flip</span>
+          <label class="switch"><input type="checkbox" id="vflip" onchange="sendCmd('vflip',this.checked?1:0)"><span
+              class="slider-sw"></span></label>
+        </div>
+        <div class="toggle-row">
+          <span class="ctrl-label">Horizontal Mirror</span>
+          <label class="switch"><input type="checkbox" id="hmirror" onchange="sendCmd('hmirror',this.checked?1:0)"><span
+              class="slider-sw"></span></label>
+        </div>
+        <div class="toggle-row">
+          <span class="ctrl-label">DCW</span>
+          <label class="switch"><input type="checkbox" id="dcw" checked onchange="sendCmd('dcw',this.checked?1:0)"><span
+              class="slider-sw"></span></label>
+        </div>
+        <div class="toggle-row">
+          <span class="ctrl-label">BPC</span>
+          <label class="switch"><input type="checkbox" id="bpc" onchange="sendCmd('bpc',this.checked?1:0)"><span
+              class="slider-sw"></span></label>
+        </div>
+        <div class="toggle-row">
+          <span class="ctrl-label">WPC</span>
+          <label class="switch"><input type="checkbox" id="wpc" checked onchange="sendCmd('wpc',this.checked?1:0)"><span
+              class="slider-sw"></span></label>
+        </div>
+        <div class="toggle-row">
+          <span class="ctrl-label">Raw GMA</span>
+          <label class="switch"><input type="checkbox" id="raw_gma" checked
+              onchange="sendCmd('raw_gma',this.checked?1:0)"><span class="slider-sw"></span></label>
+        </div>
+        <div class="toggle-row">
+          <span class="ctrl-label">Lens Correction</span>
+          <label class="switch"><input type="checkbox" id="lenc" checked
+              onchange="sendCmd('lenc',this.checked?1:0)"><span class="slider-sw"></span></label>
+        </div>
+        <div class="toggle-row">
+          <span class="ctrl-label">Color Bar</span>
+          <label class="switch"><input type="checkbox" id="colorbar"
+              onchange="sendCmd('colorbar',this.checked?1:0)"><span class="slider-sw"></span></label>
+        </div>
+      </div>
+
+      <!-- LED Flash -->
+      <div class="section">
+        <div class="section-title">💡 LED Flash</div>
+        <div class="ctrl-row">
+          <span class="ctrl-label">Intensity</span>
+          <input type="range" id="led_intensity" min="0" max="255" value="0"
+            oninput="sendCmd('led_intensity',this.value); document.getElementById('led-val').textContent=this.value">
+          <span class="ctrl-value" id="led-val">0</span>
+        </div>
+      </div>
+
+      <!-- Face detection (only shown if enabled) -->
+      <div class="section" id="face-section" style="display:none">
+        <div class="section-title">🧠 Face Detection</div>
+        <div class="toggle-row">
+          <span class="ctrl-label">Face Detect</span>
+          <label class="switch"><input type="checkbox" id="face_detect"
+              onchange="sendCmd('face_detect',this.checked?1:0)"><span class="slider-sw"></span></label>
+        </div>
+        <div class="toggle-row">
+          <span class="ctrl-label">Face Recognize</span>
+          <label class="switch"><input type="checkbox" id="face_recognize"
+              onchange="sendCmd('face_recognize',this.checked?1:0)"><span class="slider-sw"></span></label>
+        </div>
+        <div class="btn-row" style="margin-top:8px">
+          <button class="btn" onclick="sendCmd('face_enroll',1)">➕ Enroll Face</button>
+        </div>
+      </div>
+
+    </div><!-- end sidebar -->
+  </main>
+
+  <!-- Status bar -->
+  <div id="status-bar">
+    <span id="status-msg">Ready. Enter your ESP32-CAM IP in the browser address bar.</span>
+    <span id="ip-label"></span>
+  </div>
+
+  <!-- ── JavaScript ──────────────────────────────────────────── -->
+  <script>
+    "use strict";
+
+    /* ---- Config ---- */
+    const CAM_IP = window.location.hostname; // works when page is served from the ESP32
+    const BASE_URL = `http://${CAM_IP}`;
+    const STREAM_URL = `http://${CAM_IP}:81/stream`;
+
+    /* ---- State ---- */
+    let streamOn = false, flashOn = false;
+
+    /* ---- Elements ---- */
+    const img = document.getElementById('stream');
+    const noStream = document.getElementById('no-stream');
+    const btnStream = document.getElementById('btn-stream');
+    const btnFlash = document.getElementById('btn-flash');
+    const fpsBadge = document.getElementById('fps-badge');
+    const connDot = document.getElementById('conn-dot');
+    const connLabel = document.getElementById('conn-label');
+    const statusMsg = document.getElementById('status-msg');
+    const ipLabel = document.getElementById('ip-label');
+
+    /* ---- Helpers ---- */
+    function setStatus(msg, ok = true) {
+      statusMsg.textContent = msg;
+      statusMsg.style.color = ok ? '#8b949e' : '#f85149';
+    }
+
+    function sendCmd(variable, value) {
+      fetch(`${BASE_URL}/control?var=${variable}&val=${value}`)
+        .catch(e => setStatus(`⚠ Command failed: ${variable}`, false));
+    }
+
+    /* ---- Stream ---- */
+    function toggleStream() {
+      if (!streamOn) {
+        img.src = STREAM_URL;
+        img.style.display = 'block';
+        noStream.style.display = 'none';
+        fpsBadge.style.display = 'block';
+        btnStream.textContent = '⏹ Stop Stream';
+        btnStream.classList.replace('primary', 'danger');
+        setStatus('Streaming live from ESP32-CAM…');
+        streamOn = true;
+      } else {
+        img.src = '';
+        img.style.display = 'none';
+        noStream.style.display = 'block';
+        fpsBadge.style.display = 'none';
+        btnStream.textContent = '▶ Start Stream';
+        btnStream.classList.replace('danger', 'primary');
+        setStatus('Stream stopped.');
+        streamOn = false;
+      }
+    }
+
+    /* ---- Capture ---- */
+    function capture() {
+      const a = document.createElement('a');
+      a.href = `${BASE_URL}/capture`;
+      a.target = '_blank';
+      a.download = `esp32cam_${Date.now()}.jpg`;
+      a.click();
+      setStatus('📸 Capture requested…');
+    }
+
+    /* ---- Flash ---- */
+    function toggleFlash() {
+      flashOn = !flashOn;
+      sendCmd('led_intensity', flashOn ? 255 : 0);
+      document.getElementById('led_intensity').value = flashOn ? 255 : 0;
+      document.getElementById('led-val').textContent = flashOn ? 255 : 0;
+      btnFlash.classList.toggle('active', flashOn);
+      btnFlash.textContent = flashOn ? '💡 Flash ON' : '💡 Flash';
+    }
+
+    /* ---- Fullscreen ---- */
+    function toggleFullscreen() {
+      const el = document.getElementById('stream-panel');
+      if (!document.fullscreenElement) el.requestFullscreen();
+      else document.exitFullscreen();
+    }
+
+    /* ---- Load current camera status ---- */
+    function loadStatus() {
+      fetch(`${BASE_URL}/status`)
+        .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+        .then(d => {
+          connDot.classList.add('online');
+          connLabel.textContent = 'Online';
+          ipLabel.textContent = `IP: ${CAM_IP}`;
+          setStatus('Connected to ESP32-CAM.');
+
+          // Ranges
+          const ranges = ['quality', 'brightness', 'contrast', 'saturation', 'ae_level',
+            'aec_value', 'agc_gain', 'gainceiling', 'led_intensity'];
+          ranges.forEach(k => {
+            const el = document.getElementById(k);
+            const val = document.getElementById(k.replace('_', '-').replace('value', 'val').replace('aec_val', 'aecv-val').replace('ae-level', 'ae-val'));
+            if (el && d[k] !== undefined) { el.value = d[k]; }
+          });
+          // Select
+          ['framesize', 'special_effect'].forEach(k => {
+            const el = document.getElementById(k);
+            if (el && d[k] !== undefined) el.value = d[k];
+          });
+          // Toggles (checkboxes)
+          ['awb', 'awb_gain', 'aec', 'aec2', 'agc', 'vflip', 'hmirror', 'dcw', 'bpc', 'wpc', 'raw_gma', 'lenc', 'colorbar'].forEach(k => {
+            const el = document.getElementById(k);
+            if (el && d[k] !== undefined) el.checked = !!d[k];
+          });
+          // Face detection section
+          if (d.face_detect !== undefined) {
+            document.getElementById('face-section').style.display = '';
+            document.getElementById('face_detect').checked = !!d.face_detect;
+            if (d.face_recognize !== undefined)
+              document.getElementById('face_recognize').checked = !!d.face_recognize;
+          }
+          // Display value labels
+          const labelMap = {
+            quality: 'q-val', brightness: 'br-val', contrast: 'co-val',
+            saturation: 'sa-val', ae_level: 'ae-val', aec_value: 'aecv-val',
+            agc_gain: 'agcg-val', gainceiling: 'gc-val', led_intensity: 'led-val'
+          };
+          Object.entries(labelMap).forEach(([k, lid]) => {
+            const lel = document.getElementById(lid);
+            if (lel && d[k] !== undefined) lel.textContent = d[k];
+          });
+        })
+        .catch(() => {
+          connDot.classList.remove('online');
+          connLabel.textContent = 'Offline';
+          setStatus(`⚠ Cannot reach ESP32-CAM at ${CAM_IP}. Check IP and Wi-Fi.`, false);
+        });
+    }
+
+    /* ---- Initialise ---- */
+    window.addEventListener('load', loadStatus);
+
+    /* ---- Image error handler ---- */
+    img.addEventListener('error', () => {
+      if (streamOn) setStatus('⚠ Stream interrupted. Check connection.', false);
+    });
+  </script>
+</body>
+
+</html>
