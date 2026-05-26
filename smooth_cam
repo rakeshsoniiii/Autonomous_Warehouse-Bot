@@ -1,0 +1,270 @@
+import cv2
+import numpy as np
+import requests
+import tensorflow as tf
+import time
+import threading
+from collections import deque # <-- NAYA IMPORT (Smoothing ke liye)
+
+# ================= LOAD MODEL =================
+model = tf.keras.models.load_model("warehouse_ai_model.h5")
+classes = ["ball", "Square", "unknown"]
+
+# ================= BACKGROUND VIDEO STREAM =================
+class VideoStream:
+    def __init__(self, src):
+        self.stream = cv2.VideoCapture(src, cv2.CAP_FFMPEG)
+        self.stream.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+        (self.grabbed, self.frame) = self.stream.read()
+        self.stopped = False
+        threading.Thread(target=self.update, args=(), daemon=True).start()
+
+    def update(self):
+        while not self.stopped:
+            (self.grabbed, self.frame) = self.stream.read()
+
+    def read(self):
+        return self.grabbed, self.frame
+
+    def stop(self):
+        self.stopped = True
+        self.stream.release()
+
+# ================= ESP32 CAM =================
+url = "http://172.20.10.7:81/stream"
+cap = VideoStream(url)
+
+# ================= ROBOT ESP32 =================
+robot_ip = "172.20.10.6"
+
+# ================= ASYNC NETWORK REQUESTS =================
+def async_request(url_path):
+    try:
+        requests.get(url_path, timeout=0.5)
+    except:
+        pass
+
+def send_command(url_path):
+    threading.Thread(target=async_request, args=(url_path,), daemon=True).start()
+
+# ================= ARUCO =================
+aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_50)
+aruco_params = cv2.aruco.DetectorParameters()
+aruco_detector = cv2.aruco.ArucoDetector(aruco_dict, aruco_params)
+
+# ================= WINDOW =================
+window_name = "WAREHOUSE AI"
+cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
+cv2.resizeWindow(window_name, 1000, 700)
+
+# ================= VARIABLES =================
+current_object = None
+detect_start_time = 0
+required_duration = 5.0 # <-- UPDATE KIYA HAI 5 SECONDS KE LIYE
+object_locked = False
+target_marker = None
+last_marker = -1
+navigation_started = False
+marker_reached = False
+status_text = "WAITING FOR OBJECT"
+frame_count = 0
+detect_again_visible = False
+default_path_end_time = 0 
+
+# BUFFER FOR STABLE DETECTION (Taaki 1 bad frame se timer reset na ho)
+prediction_history = deque(maxlen=10)
+
+# ================= BUTTON =================
+button_x1, button_y1 = 700, 20
+button_x2, button_y2 = 950, 80
+
+# ================= MOTOR =================
+def move(l, r):
+    send_command(f"http://{robot_ip}/drive?l={l}&r={r}")
+
+def stop():
+    send_command(f"http://{robot_ip}/stop")
+
+# ================= MOUSE =================
+def mouse_click(event, x, y, flags, param):
+    global object_locked, target_marker, navigation_started
+    global marker_reached, detect_again_visible, status_text
+    global current_object, default_path_end_time, prediction_history
+
+    if event == cv2.EVENT_LBUTTONDOWN:
+        if (detect_again_visible and button_x1 <= x <= button_x2 and button_y1 <= y <= button_y2):
+            object_locked = False
+            target_marker = None
+            navigation_started = False
+            marker_reached = False
+            detect_again_visible = False
+            current_object = None
+            default_path_end_time = 0
+            prediction_history.clear() # Reset history
+            status_text = "WAITING FOR OBJECT"
+
+cv2.setMouseCallback(window_name, mouse_click)
+
+# ================= LOOP =================
+while True:
+    try:
+        frame_count += 1
+
+        # ================= CAMERA =================
+        ret, frame = cap.read()
+        if not ret or frame is None:
+            continue
+
+        frame = cv2.resize(frame, (1000, 700))
+
+        # ================= CENTER BOX =================
+        h, w, _ = frame.shape
+        size = 220
+        x1, y1 = w//2 - size//2, h//2 - size//2
+        x2, y2 = x1 + size, y1 + size
+        crop = frame[y1:y2, x1:x2]
+
+        # ================= ARUCO DETECT =================
+        corners, ids, rejected = aruco_detector.detectMarkers(frame)
+        marker_text = ""
+
+        if ids is not None:
+            ids = ids.flatten()
+            cv2.aruco.drawDetectedMarkers(frame, corners, ids)
+
+            for i, marker_id in enumerate(ids):
+                marker_text = f"ARUCO ID : {marker_id}"
+                if marker_id != last_marker:
+                    print(f"ARUCO ID : {marker_id}")
+                    last_marker = marker_id
+
+        # ================= DEFAULT PATH TIMER LOGIC =================
+        if object_locked and not navigation_started and not marker_reached:
+            if time.time() >= default_path_end_time:
+                navigation_started = True
+            else:
+                status_text = "EXECUTING DEFAULT PATH..."
+
+        # ================= OBJECT DETECT =================
+        if not object_locked and frame_count % 8 == 0:
+            
+            # BIG FIX 1: Convert BGR to RGB so MobileNetV2 detects correctly
+            rgb_crop = cv2.cvtColor(crop, cv2.COLOR_BGR2RGB)
+            
+            img = cv2.resize(rgb_crop, (224, 224))
+            img = img.astype(np.float32) / 255.0
+            img = np.expand_dims(img, axis=0)
+
+            prediction = model.predict(img, verbose=0)
+            class_index = np.argmax(prediction)
+            confidence = np.max(prediction)
+            raw_detected = classes[class_index]
+
+            # Thoda confidence kam kar diya taaki fluctuation na ho
+            if confidence < 0.75: 
+                raw_detected = "unknown"
+
+            # BIG FIX 2: Prediction History (Smoothing)
+            prediction_history.append(raw_detected)
+            
+            # Find mostly detected object in last 10 frames
+            stable_detected = max(set(prediction_history), key=prediction_history.count)
+
+            # ================= TIMER LOGIC (5 SECONDS) =================
+            if stable_detected != current_object:
+                current_object = stable_detected
+                detect_start_time = time.time()
+
+            elapsed_time = time.time() - detect_start_time
+
+            # Sirf tab confirm hoga jab stable_detected 5 second tak same rahe
+            if elapsed_time >= required_duration and stable_detected != "unknown":
+                
+                detected = stable_detected
+                
+                if detected == "ball":
+                    status_text = "BALL -> ID1"
+                    target_marker = 1
+                    print("GO TO ID1")
+                    send_command(f"http://{robot_ip}/id1")
+
+                elif detected == "Square":
+                    status_text = "SQUARE -> ID2"
+                    target_marker = 2
+                    print("GO TO ID2")
+                    send_command(f"http://{robot_ip}/id2")
+
+                object_locked = True
+                default_path_end_time = time.time() + 3.0
+                navigation_started = False 
+            else:
+                if stable_detected == "unknown":
+                    status_text = "WAITING FOR OBJECT"
+                else:
+                    status_text = f"CONFIRMING {stable_detected.upper()} {elapsed_time:.1f}/5s"
+
+        # ================= ARUCO FOLLOW =================
+        if navigation_started and target_marker is not None and not marker_reached:
+            if ids is not None:
+                found_target = False
+                for i, marker_id in enumerate(ids):
+                    if marker_id == target_marker:
+                        found_target = True
+                        c = corners[i][0]
+                        center_x = int(c[:, 0].mean())
+                        marker_area = cv2.contourArea(corners[i])
+
+                        if center_x < 420:
+                            status_text = "ALIGN LEFT"
+                            move(70, 130)
+                        elif center_x > 580:
+                            status_text = "ALIGN RIGHT"
+                            move(130, 70)
+                        else:
+                            if marker_area > 90000:
+                                status_text = f"ID {target_marker} REACHED"
+                                print(f"ID {target_marker} REACHED")
+                                stop()
+                                marker_reached = True
+                                detect_again_visible = True
+                            else:
+                                status_text = "FOLLOWING ARUCO"
+                                move(90, 90)
+
+                if not found_target:
+                    status_text = "SEARCHING TARGET"
+                    move(80, -80)
+            else:
+                status_text = "SEARCHING MARKER"
+                move(80, -80)
+
+        # ================= UI =================
+        overlay = frame.copy()
+        cv2.rectangle(overlay, (0, 0), (1000, 100), (20, 20, 20), -1)
+        alpha = 0.6
+        frame = cv2.addWeighted(overlay, alpha, frame, 1 - alpha, 0)
+
+        color = (255, 255, 255) if object_locked else (0, 255, 255)
+        cv2.rectangle(frame, (x1, y1), (x2, y2), color, 3)
+
+        cv2.putText(frame, status_text, (20, 60), cv2.FONT_HERSHEY_SIMPLEX, 1, color, 3)
+
+        if marker_text != "":
+            cv2.putText(frame, marker_text, (20, 95), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 0), 2)
+
+        if detect_again_visible:
+            cv2.rectangle(frame, (button_x1, button_y1), (button_x2, button_y2), (0, 255, 0), -1)
+            cv2.putText(frame, "DETECT AGAIN", (730, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 0), 3)
+
+        cv2.imshow(window_name, frame)
+
+    except Exception as e:
+        print(f"Error: {e}")
+
+    # ================= EXIT =================
+    if cv2.waitKey(1) == 27:
+        stop()
+        break
+
+cap.stop() 
+cv2.destroyAllWindows()
