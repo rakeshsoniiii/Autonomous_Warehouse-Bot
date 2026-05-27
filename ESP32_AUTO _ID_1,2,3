@@ -107,30 +107,26 @@ void stopBot() {
 
 long getDistance() {
 
-  long duration;
-  long distance;
-  long total = 0;
+  digitalWrite(TRIG_PIN, LOW);
+  delayMicroseconds(2);
 
-  for(int i=0;i<5;i++){
+  digitalWrite(TRIG_PIN, HIGH);
+  delayMicroseconds(10);
 
-    digitalWrite(TRIG_PIN, LOW);
-    delayMicroseconds(2);
+  digitalWrite(TRIG_PIN, LOW);
 
-    digitalWrite(TRIG_PIN, HIGH);
-    delayMicroseconds(10);
+  long duration = pulseIn(ECHO_PIN, HIGH, 18000);
 
-    digitalWrite(TRIG_PIN, LOW);
+  long distance = duration * 0.034 / 2;
 
-    duration = pulseIn(ECHO_PIN, HIGH, 25000);
+  // INVALID VALUES IGNORE
 
-    distance = duration * 0.034 / 2;
+  if(distance <= 0 || distance > 200){
 
-    total += distance;
-
-    delay(5);
+    return 999;
   }
 
-  return total / 5;
+  return distance;
 }
 
 // ===================== LOADING =====================
@@ -218,37 +214,37 @@ void bypassObstacle(){
     "OBJECT..."
   );
 
-  setMotors(-150,-150);
+  setMotors(-200,-200);
   delay(500);
 
   stopBot();
   delay(100);
 
-  setMotors(220,-220);
+  setMotors(250,-250);
   delay(600);
 
   stopBot();
   delay(100);
 
-  setMotors(150,150);
+  setMotors(200,200);
   delay(1000);
 
   stopBot();
   delay(100);
 
-  setMotors(-220,220);
+  setMotors(-250,250);
   delay(520);
 
   stopBot();
   delay(100);
 
-  setMotors(180,180);
+  setMotors(220,220);
   delay(1000);
 
   stopBot();
   delay(100);
 
-  setMotors(-220,220);
+  setMotors(-250,250);
   delay(520);
 
   stopBot();
@@ -315,8 +311,32 @@ void goID1(){
     ""
   );
 
+  long start1 = millis();
+
   setMotors(120,120);
-  delay(1500);
+
+  while(millis() - start1 < 1500){
+
+    long d = getDistance();
+
+    if(d > 5 && d < 10){
+
+      stopBot();
+
+      showLCD(
+        "OBJECT",
+        "DETECTED"
+      );
+
+      delay(500);
+
+      bypassObstacle();
+
+      return;
+    }
+
+    delay(20);
+  }
 
   stopBot();
   delay(120);
@@ -326,7 +346,7 @@ void goID1(){
     ""
   );
 
-  setMotors(220,-220);
+  setMotors(250,-250);
   delay(520);
 
   stopBot();
@@ -337,52 +357,80 @@ void goID1(){
     ""
   );
 
+  long start2 = millis();
+
   setMotors(150,150);
-  delay(1500);
+
+  while(millis() - start2 < 1500){
+
+    long d = getDistance();
+
+    // CHANGED ONLY THIS
+
+    if(d > 0 && d < 15){
+
+      stopBot();
+
+      showLCD(
+        "OBJECT",
+        "DETECTED"
+      );
+
+      delay(500);
+
+      bypassObstacle();
+
+      return;
+    }
+
+    delay(20);
+  }
 
   stopBot();
   delay(120);
 
   showLCD(
-    "CHECKING",
-    "OBJECT"
+    "NO OBJECT",
+    "STRAIGHT"
   );
 
-  long firstCheck = getDistance();
+  long start3 = millis();
 
-  if(firstCheck > 0 && firstCheck < 22){
+  setMotors(120,120);
 
-    stopBot();
+  while(millis() - start3 < 1800){
 
-    showLCD(
-      "OBJECT",
-      "DETECTED"
-    );
+    long d = getDistance();
 
-    delay(1000);
+    // CHANGED ONLY THIS
 
-    bypassObstacle();
+    if(d > 0 && d < 15){
+
+      stopBot();
+
+      showLCD(
+        "OBJECT",
+        "DETECTED"
+      );
+
+      delay(500);
+
+      bypassObstacle();
+
+      return;
+    }
+
+    delay(20);
   }
 
-  else{
+  stopBot();
 
-    showLCD(
-      "NO OBJECT",
-      "STRAIGHT"
-    );
+  showLCD(
+    "ID REACHED",
+    "SUCCESS"
+  );
 
-    setMotors(120,120);
-    delay(1800);
-
-    stopBot();
-
-    showLCD(
-      "ID REACHED",
-      "SUCCESS"
-    );
-
-    delay(2000);
-  }
+  delay(2000);
 }
 
 // ===================== ID2 =====================
@@ -391,6 +439,8 @@ void goID2(){
 
   lastID = 2;
 
+  obstacleHandled = false;
+
   loadingAnimation("GO TO ID2");
 
   showLCD(
@@ -398,8 +448,34 @@ void goID2(){
     "ID2"
   );
 
+  long start4 = millis();
+
   setMotors(200,200);
-  delay(2500);
+
+  while(millis() - start4 < 2500){
+
+    long d = getDistance();
+
+    // CHANGED ONLY THIS
+
+    if(d > 0 && d < 15){
+
+      stopBot();
+
+      showLCD(
+        "OBJECT",
+        "DETECTED"
+      );
+
+      delay(500);
+
+      bypassObstacle();
+
+      return;
+    }
+
+    delay(20);
+  }
 
   stopBot();
 
@@ -417,6 +493,8 @@ void goID3(){
 
   lastID = 3;
 
+  obstacleHandled = false;
+
   loadingAnimation("GO TO ID3");
 
   showLCD(
@@ -424,33 +502,53 @@ void goID3(){
     "ID3"
   );
 
-  // RIGHT
-
   showLCD(
     "RIGHT TURN",
     ""
   );
 
-  setMotors(220,-220);
+  setMotors(250,-250);
   delay(520);
 
   stopBot();
   delay(120);
-
-  // FORWARD
 
   showLCD(
     "FORWARD",
     ""
   );
 
+  long start5 = millis();
+
   setMotors(150,150);
-  delay(2000);
+
+  while(millis() - start5 < 2000){
+
+    long d = getDistance();
+
+    // CHANGED ONLY THIS
+
+    if(d > 0 && d < 15){
+
+      stopBot();
+
+      showLCD(
+        "OBJECT",
+        "DETECTED"
+      );
+
+      delay(500);
+
+      bypassObstacle();
+
+      return;
+    }
+
+    delay(20);
+  }
 
   stopBot();
   delay(120);
-
-  // LEFT
 
   showLCD(
     "LEFT TURN",
@@ -463,15 +561,39 @@ void goID3(){
   stopBot();
   delay(120);
 
-  // FINAL FORWARD
-
   showLCD(
     "FINAL MOVE",
     ""
   );
 
+  long start6 = millis();
+
   setMotors(180,180);
-  delay(2000);
+
+  while(millis() - start6 < 2000){
+
+    long d = getDistance();
+
+    // CHANGED ONLY THIS
+
+    if(d > 0 && d < 15){
+
+      stopBot();
+
+      showLCD(
+        "OBJECT",
+        "DETECTED"
+      );
+
+      delay(500);
+
+      bypassObstacle();
+
+      return;
+    }
+
+    delay(20);
+  }
 
   stopBot();
 
@@ -588,103 +710,11 @@ void handleHome(){
 
     <title>Warehouse Bot</title>
 
-    <style>
-
-      body{
-        background:#111;
-        color:white;
-        font-family:Arial;
-        text-align:center;
-        padding-top:50px;
-      }
-
-      button{
-
-        width:220px;
-        height:70px;
-
-        margin:15px;
-
-        font-size:22px;
-
-        border:none;
-
-        border-radius:12px;
-
-        cursor:pointer;
-      }
-
-      .id1{
-        background:#2196F3;
-        color:white;
-      }
-
-      .id2{
-        background:#9C27B0;
-        color:white;
-      }
-
-      .id3{
-        background:#009688;
-        color:white;
-      }
-
-      .stop{
-        background:#ff9800;
-        color:white;
-      }
-
-      .manual{
-        background:#4CAF50;
-        color:white;
-      }
-
-    </style>
-
   </head>
 
   <body>
 
     <h1>WAREHOUSE BOT</h1>
-
-    <h2>)rawliteral";
-
-  html += currentMessage;
-
-  html += R"rawliteral(</h2>
-
-    <button class='id1'
-    onclick="location.href='/id1'">
-    GO ID1
-    </button>
-
-    <br>
-
-    <button class='id2'
-    onclick="location.href='/id2'">
-    GO ID2
-    </button>
-
-    <br>
-
-    <button class='id3'
-    onclick="location.href='/id3'">
-    GO ID3
-    </button>
-
-    <br>
-
-    <button class='stop'
-    onclick="location.href='/stop'">
-    STOP
-    </button>
-
-    <br>
-
-    <button class='manual'
-    onclick="location.href='/drive?l=150&r=150'">
-    FORWARD
-    </button>
 
   </body>
 
