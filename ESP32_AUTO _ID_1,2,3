@@ -371,14 +371,12 @@ void goID1(){
 
   delay(2000);
 
-  // RETURN
+  // RETURN HOME
 
   showLCD(
     "RETURNING",
     "HOME..."
   );
-
-  // 180 TURN
 
   setMotors(250,-250);
   delay(1100);
@@ -386,10 +384,8 @@ void goID1(){
   stopBot();
   delay(150);
 
-  // SAME PATH RETURN
-
-  setMotors(200,200);
-  delay(2000);
+  setMotors(120,120);
+  delay(1800);
 
   stopBot();
   delay(120);
@@ -400,7 +396,7 @@ void goID1(){
   stopBot();
   delay(120);
 
-  setMotors(150,150);
+  setMotors(120,120);
   delay(1500);
 
   stopBot();
@@ -408,6 +404,12 @@ void goID1(){
 
   setMotors(-220,220);
   delay(520);
+
+  stopBot();
+  delay(120);
+
+  setMotors(120,120);
+  delay(1600);
 
   stopBot();
 
@@ -470,14 +472,12 @@ void goID2(){
 
   delay(2000);
 
-  // RETURN
+  // RETURN HOME
 
   showLCD(
     "RETURNING",
     "HOME..."
   );
-
-  // 180 TURN
 
   setMotors(220,-220);
   delay(1050);
@@ -485,10 +485,8 @@ void goID2(){
   stopBot();
   delay(150);
 
-  // SAME PATH RETURN
-
   setMotors(200,200);
-  delay(2500);
+  delay(2700);
 
   stopBot();
 
@@ -613,14 +611,12 @@ void goID3(){
 
   delay(2000);
 
-  // RETURN
+  // RETURN HOME
 
   showLCD(
     "RETURNING",
     "HOME..."
   );
-
-  // 180 TURN
 
   setMotors(220,-220);
   delay(1050);
@@ -628,10 +624,8 @@ void goID3(){
   stopBot();
   delay(150);
 
-  // SAME PATH RETURN
-
   setMotors(180,180);
-  delay(2000);
+  delay(2200);
 
   stopBot();
   delay(120);
@@ -643,13 +637,19 @@ void goID3(){
   delay(120);
 
   setMotors(150,150);
-  delay(2000);
+  delay(2200);
 
   stopBot();
   delay(120);
 
   setMotors(-220,220);
   delay(520);
+
+  stopBot();
+  delay(120);
+
+  setMotors(150,150);
+  delay(1500);
 
   stopBot();
 
@@ -753,11 +753,102 @@ void handleHome(){
 
     <title>Warehouse Bot</title>
 
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <style>
+
+      body{
+        font-family: Arial;
+        text-align: center;
+        background: #111;
+        color: white;
+        margin-top: 50px;
+      }
+
+      h1{
+        margin-bottom: 40px;
+      }
+
+      button{
+        width: 220px;
+        height: 70px;
+        margin: 15px;
+        font-size: 24px;
+        border: none;
+        border-radius: 15px;
+        cursor: pointer;
+        font-weight: bold;
+      }
+
+      .id1{
+        background: #00b894;
+        color: white;
+      }
+
+      .id2{
+        background: #0984e3;
+        color: white;
+      }
+
+      .id3{
+        background: #6c5ce7;
+        color: white;
+      }
+
+      .stop{
+        background: red;
+        color: white;
+      }
+
+    </style>
+
   </head>
 
   <body>
 
     <h1>WAREHOUSE BOT</h1>
+
+    <button class="id1" onclick="goID1()">
+      GO ID 1
+    </button>
+
+    <br>
+
+    <button class="id2" onclick="goID2()">
+      GO ID 2
+    </button>
+
+    <br>
+
+    <button class="id3" onclick="goID3()">
+      GO ID 3
+    </button>
+
+    <br>
+
+    <button class="stop" onclick="stopBot()">
+      STOP
+    </button>
+
+    <script>
+
+      function goID1(){
+        fetch('/id1');
+      }
+
+      function goID2(){
+        fetch('/id2');
+      }
+
+      function goID3(){
+        fetch('/id3');
+      }
+
+      function stopBot(){
+        fetch('/stop');
+      }
+
+    </script>
 
   </body>
 
