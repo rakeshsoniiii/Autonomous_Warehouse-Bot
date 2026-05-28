@@ -243,8 +243,8 @@ void goID1(){
     ""
   );
 
-  setMotors(-220,220);
-  delay(520);
+  setMotors(-270,270);
+  delay(510);
 
   stopBot();
   delay(120);
@@ -256,7 +256,7 @@ void goID1(){
 
   long start1 = millis();
 
-  setMotors(120,120);
+  setMotors(200,200);
 
   while(millis() - start1 < 1500){
 
@@ -290,7 +290,7 @@ void goID1(){
   );
 
   setMotors(250,-250);
-  delay(520);
+  delay(550);
 
   stopBot();
   delay(120);
@@ -302,7 +302,7 @@ void goID1(){
 
   long start2 = millis();
 
-  setMotors(150,150);
+  setMotors(250,250);
 
   while(millis() - start2 < 1500){
 
@@ -378,14 +378,14 @@ void goID1(){
     "HOME..."
   );
 
-  setMotors(250,-250);
-  delay(1100);
+  setMotors(280,-280);
+  delay(1250);
 
   stopBot();
   delay(150);
 
-  setMotors(120,120);
-  delay(1800);
+  setMotors(280,280);
+  delay(3000);
 
   stopBot();
   delay(120);
@@ -396,7 +396,7 @@ void goID1(){
   stopBot();
   delay(120);
 
-  setMotors(120,120);
+  setMotors(200,200);
   delay(1500);
 
   stopBot();
@@ -408,8 +408,6 @@ void goID1(){
   stopBot();
   delay(120);
 
-  setMotors(120,120);
-  delay(1600);
 
   stopBot();
 
@@ -479,14 +477,17 @@ void goID2(){
     "HOME..."
   );
 
-  setMotors(220,-220);
-  delay(1050);
+  setMotors(250,-250);
+  delay(1100);
 
   stopBot();
   delay(150);
 
   setMotors(200,200);
   delay(2700);
+
+  setMotors(-250,250);
+  delay(520);
 
   stopBot();
 
