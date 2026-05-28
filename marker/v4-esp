@@ -1,0 +1,188 @@
+#include <WiFi.h>
+#include <WebServer.h>
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
+
+const char* ssid     = "Rak";
+const char* password = "@1212@#1";
+
+WebServer server(80);
+LiquidCrystal_I2C lcd(0x27, 16, 2);
+
+// ================== MOTOR PINS ==================
+#define IN1 4
+#define IN2 5
+#define ENA 14
+
+#define IN3 18
+#define IN4 19
+#define ENB 13
+
+// ================== VARIABLES ==================
+bool missionActive = false;
+int targetID = 0;
+
+// ================== MOTOR CONTROL ==================
+void setMotors(int l, int r) {
+  if (l >= 0) {
+    digitalWrite(IN1, HIGH);
+    digitalWrite(IN2, LOW);
+  } else {
+    digitalWrite(IN1, LOW);
+    digitalWrite(IN2, HIGH);
+    l = -l; // Make positive for PWM
+  }
+
+  if (r >= 0) {
+    digitalWrite(IN3, HIGH);
+    digitalWrite(IN4, LOW);
+  } else {
+    digitalWrite(IN3, LOW);
+    digitalWrite(IN4, HIGH);
+    r = -r; // Make positive for PWM
+  }
+
+  // Pure speed control
+  ledcWrite(ENA, constrain(l, 0, 255));
+  ledcWrite(ENB, constrain(r, 0, 255));
+}
+
+void stopBot() {
+  digitalWrite(IN1, LOW);
+  digitalWrite(IN2, LOW);
+  digitalWrite(IN3, LOW);
+  digitalWrite(IN4, LOW);
+  ledcWrite(ENA, 0);
+  ledcWrite(ENB, 0);
+}
+
+// ================== ROUTES ==================
+void handleDrive() {
+  int l = server.arg("l").toInt();
+  int r = server.arg("r").toInt();
+  setMotors(l, r);
+  server.send(200, "text/plain", "OK");
+}
+
+void handleStop() {
+  stopBot();
+  missionActive = false;
+  targetID = 0;
+
+  lcd.clear();
+  lcd.print("READY / IDLE");
+  server.send(200, "text/plain", "STOPPED");
+}
+
+void handleMission() {
+  if (server.hasArg("id")) {
+    targetID = server.arg("id").toInt();
+    missionActive = true;
+
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print("PATH: ");
+    lcd.print(targetID);
+    lcd.print(" -> 3"); // Dynamically prints 2->3, 4->3, or 5->3
+    lcd.setCursor(0, 1);
+    lcd.print("SPEED: MAX");
+
+    server.send(200, "text/plain", "MISSION STARTED");
+  }
+}
+
+void handleStatus() {
+  String json = "{";
+  json += "\"mission\":";
+  json += missionActive ? "1" : "0";
+  json += ",";
+  json += "\"target\":";
+  json += targetID;
+  json += "}";
+  server.send(200, "application/json", json);
+}
+
+// ================== WEBPAGE ==================
+void handleRoot() {
+  String page = R"rawliteral(
+<!DOCTYPE html>
+<html>
+<head>
+<title>Warehouse Bot Control</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+body { font-family: Arial; text-align: center; background: #111; color: white; margin-top: 20px; }
+h1 { font-size: 24px; }
+.btn-container { display: flex; flex-direction: column; align-items: center; }
+button { width: 280px; height: 65px; border-radius: 8px; border: none; font-size: 20px; margin: 10px; color: white; font-weight: bold; cursor: pointer; }
+.go2 { background: #4CAF50; } /* Green */
+.go4 { background: #2196F3; } /* Blue */
+.go5 { background: #9C27B0; } /* Purple */
+.stop { background: #f44336; height: 80px; margin-top: 30px; font-size: 22px; border: 2px solid white;} /* Red */
+</style>
+</head>
+<body>
+<h1>WAREHOUSE BOT (MAX SPEED)</h1>
+<hr style="border:1px solid #333; width:80%;">
+<div class="btn-container">
+  <button class="go2" onclick="fetch('/mission?id=2')">START PATH: ID 2 &rarr; ID 3</button>
+  <button class="go4" onclick="fetch('/mission?id=4')">START PATH: ID 4 &rarr; ID 3</button>
+  <button class="go5" onclick="fetch('/mission?id=5')">START PATH: ID 5 &rarr; ID 3</button>
+  
+  <button class="stop" onclick="fetch('/stop')">NORMAL STOP</button>
+</div>
+</body>
+</html>
+)rawliteral";
+
+  server.send(200, "text/html", page);
+}
+
+// ================== SETUP ==================
+void setup() {
+  Serial.begin(115200);
+  Wire.begin(21, 22);
+
+  lcd.init();
+  lcd.backlight();
+  lcd.clear();
+  lcd.print("Booting Bot...");
+
+  pinMode(IN1, OUTPUT);
+  pinMode(IN2, OUTPUT);
+  pinMode(IN3, OUTPUT);
+  pinMode(IN4, OUTPUT);
+
+  ledcAttach(ENA, 1000, 8);
+  ledcAttach(ENB, 1000, 8);
+
+  stopBot();
+  WiFi.begin(ssid, password);
+
+  lcd.clear();
+  lcd.print("Connecting WiFi");
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+
+  Serial.println(WiFi.localIP());
+  lcd.clear();
+  lcd.print(WiFi.localIP());
+  delay(2000);
+
+  server.on("/", handleRoot);
+  server.on("/drive", handleDrive);
+  server.on("/stop", handleStop);
+  server.on("/mission", handleMission);
+  server.on("/status", handleStatus);
+  server.begin();
+
+  lcd.clear();
+  lcd.print("READY / IDLE");
+}
+
+// ================== LOOP ==================
+void loop() {
+  server.handleClient();
+}
