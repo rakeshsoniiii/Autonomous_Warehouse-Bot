@@ -103,21 +103,20 @@ def send_shape(shape):
 
 # ================================================================
 #  ARUCO DETECTOR
+#  — kept identical to the working webcam test script,
+#    only difference is we sharpen the frame first to fix
+#    JPEG compression blur from the ESP32-CAM stream
 # ================================================================
 
 aruco_dict   = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_50)
-aruco_params = cv2.aruco.DetectorParameters()
+aruco_params = cv2.aruco.DetectorParameters()   # pure defaults — same as test script
+aruco_det    = cv2.aruco.ArucoDetector(aruco_dict, aruco_params)
 
-# These two settings dramatically improve detection at distance/blur:
-aruco_params.adaptiveThreshWinSizeMin  = 3
-aruco_params.adaptiveThreshWinSizeMax  = 23
-aruco_params.adaptiveThreshWinSizeStep = 4
-aruco_params.minMarkerPerimeterRate    = 0.02   # detect smaller markers
-aruco_params.maxMarkerPerimeterRate    = 4.0
-aruco_params.polygonalApproxAccuracyRate = 0.04
-aruco_params.cornerRefinementMethod   = cv2.aruco.CORNER_REFINE_SUBPIX
-
-aruco_det = cv2.aruco.ArucoDetector(aruco_dict, aruco_params)
+# Sharpening kernel applied to grayscale before detection
+# This recovers edges that JPEG compression smears
+_SHARPEN_K = np.array([[ 0, -1,  0],
+                        [-1,  5, -1],
+                        [ 0, -1,  0]], dtype=np.float32)
 
 # ================================================================
 #  SHAPE DETECTION
@@ -210,9 +209,8 @@ def follow_aruco(small_frame, display_frame):
 
     gray_small = cv2.cvtColor(small_frame, cv2.COLOR_BGR2GRAY)
 
-    # CLAHE improves contrast for detection under variable lighting
-    clahe      = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(4, 4))
-    gray_small = clahe.apply(gray_small)
+    # Sharpen to recover edges blurred by ESP32-CAM JPEG compression
+    gray_small = cv2.filter2D(gray_small, -1, _SHARPEN_K)
 
     corners, ids, _ = aruco_det.detectMarkers(gray_small)
 
@@ -220,6 +218,11 @@ def follow_aruco(small_frame, display_frame):
         return "SEARCHING...", False
 
     ids_flat = ids.flatten()
+
+    # Only care about IDs 1, 2, 3 — same filter as the test script
+    valid = [i for i, mid in enumerate(ids_flat) if mid in [1, 2, 3]]
+    if not valid:
+        return "SEARCHING...", False
 
     # Auto-pick target if not yet decided
     if target_id is None:
@@ -236,19 +239,20 @@ def follow_aruco(small_frame, display_frame):
 
         pts = corners[i][0]                  # (4,2) in small-frame coords
 
-        # Scale corners back up for display drawing
+        # Scale corners back to display resolution for drawing
         pts_big = pts.copy()
         pts_big[:, 0] *= scale_x
         pts_big[:, 1] *= scale_y
-        pts_big = pts_big.astype(np.int32)
+        pts_big_int = pts_big.astype(np.int32)
 
         mx_big = int(pts_big[:, 0].mean())
         my_big = int(pts_big[:, 1].mean())
 
-        # Draw on display frame
-        cv2.polylines(display_frame, [pts_big], True, (0, 255, 0), 2)
-        cv2.circle(display_frame, (mx_big, my_big), 7, (0, 255, 0), -1)
-        cv2.putText(display_frame, f"ArUco ID {mid}",
+        # Draw exactly like the working test script
+        cv2.aruco.drawDetectedMarkers(display_frame,
+                                      [pts_big_int.reshape(1, 4, 2).astype(np.float32)],
+                                      np.array([[mid]]))
+        cv2.putText(display_frame, f"Detected ID: {mid}",
                     (mx_big - 30, my_big - 18),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.75, (0, 255, 0), 2)
         cv2.arrowedLine(display_frame,
