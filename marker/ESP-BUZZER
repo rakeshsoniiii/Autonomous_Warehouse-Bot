@@ -1,0 +1,227 @@
+#include <WiFi.h>
+#include <WebServer.h>
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
+
+const char* ssid     = "Rak";
+const char* password = "@1212@#1";
+
+WebServer server(80);
+LiquidCrystal_I2C lcd(0x27, 16, 2);
+
+// ================== MOTOR PINS ==================
+#define IN1 4
+#define IN2 5
+#define ENA 14
+
+#define IN3 18
+#define IN4 19
+#define ENB 13
+
+// ================== BUZZER PIN ==================
+#define BUZZER_PIN 25 // Buzzer added on GPIO 25
+
+// ================== VARIABLES ==================
+bool missionActive = false;
+int targetID = 0;
+
+// ================== MOTOR CONTROL ==================
+void setMotors(int l, int r) {
+  if (l >= 0) {
+    digitalWrite(IN1, HIGH);
+    digitalWrite(IN2, LOW);
+  } else {
+    digitalWrite(IN1, LOW);
+    digitalWrite(IN2, HIGH);
+    l = -l; // Make positive for PWM
+  }
+
+  if (r >= 0) {
+    digitalWrite(IN3, HIGH);
+    digitalWrite(IN4, LOW);
+  } else {
+    digitalWrite(IN3, LOW);
+    digitalWrite(IN4, HIGH);
+    r = -r; // Make positive for PWM
+  }
+
+  // Pure speed control
+  ledcWrite(ENA, constrain(l, 0, 255));
+  ledcWrite(ENB, constrain(r, 0, 255));
+}
+
+void stopBot() {
+  digitalWrite(IN1, LOW);
+  digitalWrite(IN2, LOW);
+  digitalWrite(IN3, LOW);
+  digitalWrite(IN4, LOW);
+  ledcWrite(ENA, 0);
+  ledcWrite(ENB, 0);
+}
+
+// ================== ROUTES ==================
+void handleDrive() {
+  int l = server.arg("l").toInt();
+  int r = server.arg("r").toInt();
+  setMotors(l, r);
+  server.send(200, "text/plain", "OK");
+}
+
+void handleStop() {
+  stopBot();
+  missionActive = false;
+  targetID = 0;
+
+  lcd.clear();
+  lcd.print("IDLE @ HOME (3)");
+  server.send(200, "text/plain", "STOPPED");
+}
+
+void handleMission() {
+  if (server.hasArg("id")) {
+    targetID = server.arg("id").toInt();
+    missionActive = true;
+
+    // Single beep on mission start
+    digitalWrite(BUZZER_PIN, HIGH);
+    delay(200);
+    digitalWrite(BUZZER_PIN, LOW);
+
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print("FETCH: ID ");
+    lcd.print(targetID);
+    lcd.setCursor(0, 1);
+    lcd.print("RETURNING TO: 3"); // Always returns to 3
+
+    server.send(200, "text/plain", "MISSION STARTED");
+  }
+}
+
+// Buzzer function for when python says task is complete
+void handleBeep() {
+  // Double Beep for task completion!
+  digitalWrite(BUZZER_PIN, HIGH);
+  delay(150);
+  digitalWrite(BUZZER_PIN, LOW);
+  delay(100);
+  digitalWrite(BUZZER_PIN, HIGH);
+  delay(150);
+  digitalWrite(BUZZER_PIN, LOW);
+  
+  server.send(200, "text/plain", "BEEPED");
+}
+
+void handleStatus() {
+  String json = "{";
+  json += "\"mission\":";
+  json += missionActive ? "1" : "0";
+  json += ",";
+  json += "\"target\":";
+  json += targetID;
+  json += "}";
+  server.send(200, "application/json", json);
+}
+
+// ================== WEBPAGE ==================
+void handleRoot() {
+  String page = R"rawliteral(
+<!DOCTYPE html>
+<html>
+<head>
+<title>Warehouse Bot Hub</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+body { font-family: Arial, sans-serif; text-align: center; background: #0d1117; color: white; margin-top: 20px; }
+h1 { font-size: 24px; margin-bottom: 5px; }
+p { color: #8b949e; margin-top: 0px; font-size: 14px;}
+.btn-container { display: flex; flex-direction: column; align-items: center; }
+button { width: 300px; height: 65px; border-radius: 8px; border: none; font-size: 18px; margin: 10px; color: white; font-weight: bold; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+.go2 { background: #E91E63; } /* Pink for Circle */
+.go4 { background: #2196F3; } /* Blue for Square */
+.go5 { background: #9C27B0; } /* Purple for Unknown */
+.stop { background: #f44336; height: 80px; margin-top: 30px; font-size: 22px; border: 2px solid white;} /* Red */
+</style>
+</head>
+<body>
+<h1>WAREHOUSE BOT CONTROLLER</h1>
+<p>Bot Always Returns to HOME (ID 3)</p>
+<hr style="border:1px solid #333; width:80%; margin-bottom: 20px;">
+
+<div class="btn-container">
+  <button class="go2" onclick="fetch('/mission?id=2')">FETCH CIRCLE (ID 2)</button>
+  <button class="go4" onclick="fetch('/mission?id=4')">FETCH SQUARE (ID 4)</button>
+  <button class="go5" onclick="fetch('/mission?id=5')">FETCH UNKNOWN (ID 5)</button>
+  
+  <button class="stop" onclick="fetch('/stop')">FORCE STOP & IDLE</button>
+</div>
+
+<script>
+  const buttons = document.querySelectorAll('button:not(.stop)');
+  buttons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      btn.style.opacity = '0.5';
+      setTimeout(() => btn.style.opacity = '1', 500);
+    });
+  });
+</script>
+</body>
+</html>
+)rawliteral";
+
+  server.send(200, "text/html", page);
+}
+
+// ================== SETUP ==================
+void setup() {
+  Serial.begin(115200);
+  Wire.begin(21, 22);
+
+  lcd.init();
+  lcd.backlight();
+  lcd.clear();
+  lcd.print("Booting Bot...");
+
+  pinMode(IN1, OUTPUT);
+  pinMode(IN2, OUTPUT);
+  pinMode(IN3, OUTPUT);
+  pinMode(IN4, OUTPUT);
+  
+  pinMode(BUZZER_PIN, OUTPUT); // Buzzer Pin Initialize kiya
+  digitalWrite(BUZZER_PIN, LOW);
+
+  ledcAttach(ENA, 1000, 8);
+  ledcAttach(ENB, 1000, 8);
+
+  stopBot();
+  WiFi.begin(ssid, password);
+
+  lcd.clear();
+  lcd.print("Connecting WiFi");
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+
+  Serial.println(WiFi.localIP());
+  lcd.clear();
+  lcd.print("IP:");
+  lcd.print(WiFi.localIP());
+  delay(2000);
+
+  server.on("/", handleRoot);
+  server.on("/drive", handleDrive);
+  server.on("/stop", handleStop);
+  server.on("/mission", handleMission);
+  server.on("/status", handleStatus);
+  server.on("/beep", handleBeep); // Beep endpoint add kiya
+  server.begin();
+
+  lcd.clear();
+  lcd.print("IDLE @ HOME (3)");
+}
+
+// ================== LOOP ==================
+void loop() {
+  server.handleClient();
+}
