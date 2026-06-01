@@ -1,0 +1,57 @@
+from inference_sdk import InferenceHTTPClient
+import cv2
+
+CLIENT = InferenceHTTPClient(
+    api_url="https://detect.roboflow.com",
+    api_key="mF1bgzIacE8gPXw5x1SE"
+)
+
+cap = cv2.VideoCapture(0)
+
+while True:
+    ret, frame = cap.read()
+
+    if not ret:
+        break
+
+    cv2.imwrite("temp.jpg", frame)
+
+    result = CLIENT.infer(
+        "temp.jpg",
+        model_id="warehouse-ghkci/2"
+    )
+
+    for pred in result["predictions"]:
+
+        x = int(pred["x"])
+        y = int(pred["y"])
+        w = int(pred["width"])
+        h = int(pred["height"])
+
+        x1 = int(x - w / 2)
+        y1 = int(y - h / 2)
+        x2 = int(x + w / 2)
+        y2 = int(y + h / 2)
+
+        label = pred["class"]
+        confidence = round(pred["confidence"] * 100, 1)
+
+        cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
+
+        cv2.putText(
+            frame,
+            f"{label} {confidence}%",
+            (x1, y1 - 10),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.7,
+            (0, 255, 0),
+            2
+        )
+
+    cv2.imshow("Warehouse Detection", frame)
+
+    if cv2.waitKey(1) & 0xFF == ord("q"):
+        break
+
+cap.release()
+cv2.destroyAllWindows()
